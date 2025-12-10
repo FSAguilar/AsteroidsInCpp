@@ -1,6 +1,7 @@
+-xc++
 -std=c++17
 -IC:\SFML-2.6.2\include
--DSFML_STATIC
--D_DEBUG
--DUNICODE
--D_UNICODE
+-ID:\msys64\mingw64\include\c++\14.2.0
+-ID:\msys64\mingw64\include\c++\14.2.0\x86_64-w64-mingw32
+-ID:\msys64\mingw64\include
+--target=x86_64-w64-mingw32
