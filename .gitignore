@@ -1,0 +1,27 @@
+# Ejecutables
+*.exe
+*.out
+*.app
+
+# DLLs de SFML (no deben estar en el repositorio)
+*.dll
+
+# Archivos de compilación
+*.o
+*.obj
+*.a
+*.lib
+
+# Carpetas de build
+build/
+bin/
+obj/
+
+# Archivos de Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db

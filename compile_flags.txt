@@ -1,0 +1,6 @@
+-std=c++17
+-IC:\SFML-2.6.2\include
+-DSFML_STATIC
+-D_DEBUG
+-DUNICODE
+-D_UNICODE
