@@ -6,18 +6,21 @@
 class Bullet {
    private:
     sf::Sprite sprite;
-    sf::Texture texture;
+    static sf::Texture texture;
     sf::Vector2f currentSpeed;
     sf::Vector2f position;
-    // float speed;
     float friction = 0.98f;
+    float radius;
+    sf::CircleShape hitboxShape;
 
    public:
-    Bullet(sf::Vector2f position, sf::Vector2f initialSpeed);
+    Bullet(sf::Texture& texture, sf::Vector2f position, sf::Vector2f initialSpeed);
     ~Bullet();
     void update();
     void draw(sf::RenderWindow& window);
-    bool shouldRemove() const;  // Retorna true si debe eliminarse
+    bool shouldRemove() const;
+    sf::Vector2f getPosition() const;
+    float getRadius() const;
 };
 
 #endif

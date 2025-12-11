@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 
+#include "Bullet.h"
 #include "Player.h"
 
 int main() {

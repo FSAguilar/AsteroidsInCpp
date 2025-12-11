@@ -13,11 +13,15 @@ class Player {
     float speed;
     float friction;
     float rotationSpeed;
-    sf::Texture textures[2];
+    float scale;
+    sf::Texture textures[3];
     std::vector<Bullet> bullets;
+    sf::RectangleShape hitboxShape;
 
    public:
     Player();
+    void setupHitbox();
+    sf::RectangleShape getHitbox();
     void update();
     void draw(sf::RenderWindow& window);
     void rotateLeft();
