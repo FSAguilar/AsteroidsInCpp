@@ -5,6 +5,10 @@
 #include <cmath>
 #include <vector>
 
+enum GameMode { MENU, SINGLE_PLAYER, TWO_PLAYERS, VS_AI, PLAYING, GAME_OVER };
+GameMode currentMode = MENU;
+bool vsMode = false;
+
 sf::Sprite playerSprite;
 sf::Vector2f playerCurrentSpeed(0.f, 0.f);
 float playerSpeed = 0.2f;
@@ -14,17 +18,34 @@ float playerScale = 0.3f;
 int lives = -1;
 sf::Sprite livesSprites[3];
 int playerRespawning = -1;
-sf::Texture textures[4];
 sf::RectangleShape playerHitbox;
+sf::Sprite livesSprites2[3];
+
+sf::Sprite player2Sprite;
+sf::Vector2f player2CurrentSpeed(0.f, 0.f);
+float player2Speed = 0.2f;
+float player2Friction = 0.98f;
+float player2RotationSpeed = 5.f;
+float player2Scale = 0.3f;
+int lives2 = 3;
+int player2Respawning = -1;
+sf::RectangleShape player2Hitbox;
+bool isAI = false;
+float aiThinkTimer = 0.f;
+sf::Vector2f aiTargetPos;
+
+sf::Texture textures[4];
 sf::Vector2f screenSize(1400.f, 900.f);
 
 std::vector<sf::Sprite> bullets;
 std::vector<sf::Vector2f> bulletSpeeds;
 std::vector<int> bulletTimers;
 std::vector<sf::CircleShape> bulletHitboxes;
+std::vector<int> bulletOwners;
 float bulletFriction = 0.98f;
 float bulletRadius = 4.f;
 int bulletCD = 0;
+int bullet2CD = 0;
 
 std::vector<sf::Sprite> asteroids;
 std::vector<sf::Vector2f> asteroidSpeeds;
@@ -36,17 +57,25 @@ float asteroidRadius3 = 25.f;
 
 sf::Font font;
 sf::Text scoreText;
+sf::Text scoreText2;
 sf::RectangleShape restartButton;
 sf::Text restartButtonText;
 sf::RectangleShape startButton;
 sf::Text startButtonText;
+sf::RectangleShape player2Button;
+sf::Text player2ButtonText;
+sf::RectangleShape vsModeButton;
+sf::Text vsModeButtonText;
 
 int score = 0;
+int score2 = 0;
 
 bool checkPlayerCollisions();
+bool checkPlayer2Collisions();
+void checkBulletPlayerCollisions();
+void checkPlayerPlayerCollisions();
 
 void initializePlayer() {
-    lives = 3;
     textures[0].loadFromFile("images/sprite.png");
     textures[1].loadFromFile("images/sprite_move.png");
     textures[2].loadFromFile("images/bullet.png");
@@ -67,9 +96,6 @@ void initializePlayer() {
         playerHitbox.setOutlineColor(sf::Color::Green);
         playerHitbox.setOutlineThickness(1.f);
         playerRespawning = -1;
-    } else {
-        playerRespawning = 0;
-        lives++;
     }
 
     scoreText.setFont(font);
@@ -83,6 +109,38 @@ void initializePlayer() {
         livesSprites[i].setOrigin(playerSize.x / 2.f, 0.f);
         livesSprites[i].setScale(playerScale, playerScale);
         livesSprites[i].setPosition(30.f + i * 40.f, 40.f);
+    }
+}
+
+void initializePlayer2() {
+    player2Sprite.setTexture(textures[0]);
+    player2Sprite.setPosition(screenSize.x / 2.f + 100.f, screenSize.y / 2.f + 100.f);
+    sf::Vector2u playerSize = textures[0].getSize();
+    player2Sprite.setOrigin(playerSize.x / 2.f, 0.f);
+    player2Sprite.setScale(player2Scale, player2Scale);
+    player2Sprite.setRotation(180.f);
+    player2CurrentSpeed = sf::Vector2f(0.f, 0.f);
+
+    if (!checkPlayer2Collisions()) {
+        player2Hitbox.setSize(
+            sf::Vector2f(playerSize.x * player2Scale / 2, playerSize.y * player2Scale));
+        player2Hitbox.setOrigin(10.f, 0.f);
+        player2Hitbox.setFillColor(sf::Color::Transparent);
+        player2Hitbox.setOutlineColor(sf::Color::Cyan);
+        player2Hitbox.setOutlineThickness(1.f);
+        player2Respawning = -1;
+    }
+
+    scoreText2.setFont(font);
+    scoreText2.setCharacterSize(24);
+    scoreText2.setFillColor(sf::Color::Cyan);
+    scoreText2.setPosition(screenSize.x - 100.f, 10.f);
+
+    for (int i = 0; i < lives2; i++) {
+        livesSprites2[i].setTexture(textures[0]);
+        livesSprites2[i].setOrigin(playerSize.x / 2.f, 0.f);
+        livesSprites2[i].setScale(player2Scale, player2Scale);
+        livesSprites2[i].setPosition(screenSize.x - 30.f - i * 40.f, 40.f);
     }
 }
 void initializeButtons() {
@@ -115,13 +173,47 @@ void initializeButtons() {
     startButtonText.setOrigin(startBounds.left + startBounds.width / 2.f,
                               startBounds.top + startBounds.height / 2.f);
     startButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 35.f);
+
+    player2Button.setSize(sf::Vector2f(250.f, 70.f));
+    player2Button.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 100.f);
+    player2Button.setFillColor(sf::Color(70, 70, 70));
+    player2Button.setOutlineColor(sf::Color::White);
+    player2Button.setOutlineThickness(3.f);
+
+    player2ButtonText.setFont(font);
+    player2ButtonText.setString("Jugador 2");
+    player2ButtonText.setCharacterSize(32);
+    player2ButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect player2Bounds = player2ButtonText.getLocalBounds();
+    player2ButtonText.setOrigin(player2Bounds.left + player2Bounds.width / 2.f,
+                                player2Bounds.top + player2Bounds.height / 2.f);
+    player2ButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 135.f);
+
+    vsModeButton.setSize(sf::Vector2f(250.f, 70.f));
+    vsModeButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 200.f);
+    vsModeButton.setFillColor(sf::Color(70, 70, 70));
+    vsModeButton.setOutlineColor(sf::Color::White);
+    vsModeButton.setOutlineThickness(3.f);
+
+    vsModeButtonText.setFont(font);
+    vsModeButtonText.setString("Modo VS");
+    vsModeButtonText.setCharacterSize(32);
+    vsModeButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect vsModeBounds = vsModeButtonText.getLocalBounds();
+    vsModeButtonText.setOrigin(vsModeBounds.left + vsModeBounds.width / 2.f,
+                               vsModeBounds.top + vsModeBounds.height / 2.f);
+    vsModeButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 235.f);
 }
 
 void teleportInSides(sf::Sprite& sprite) {
-    if (sprite.getPosition().x < -50) sprite.setPosition(screenSize.x + 50, sprite.getPosition().y);
-    if (sprite.getPosition().x > screenSize.x + 50) sprite.setPosition(-50, sprite.getPosition().y);
-    if (sprite.getPosition().y < -50) sprite.setPosition(sprite.getPosition().x, screenSize.y + 50);
-    if (sprite.getPosition().y > screenSize.y + 50) sprite.setPosition(sprite.getPosition().x, -50);
+    if (sprite.getPosition().x < -100)
+        sprite.setPosition(screenSize.x + 100, sprite.getPosition().y);
+    if (sprite.getPosition().x > screenSize.x + 100)
+        sprite.setPosition(-100, sprite.getPosition().y);
+    if (sprite.getPosition().y < -100)
+        sprite.setPosition(sprite.getPosition().x, screenSize.y + 100);
+    if (sprite.getPosition().y > screenSize.y + 100)
+        sprite.setPosition(sprite.getPosition().x, -100);
 }
 
 bool checkCollision(sf::CircleShape& circle1, sf::CircleShape& circle2) {
@@ -159,6 +251,16 @@ bool checkCollision(sf::RectangleShape& rect, sf::CircleShape& circle) {
     return distanceSquared < (radius * radius);
 }
 
+bool checkCollision(sf::RectangleShape& rect1, sf::RectangleShape& rect2) {
+    if (rect1.getSize().x == 0.f || rect1.getSize().y == 0.f) return false;
+    if (rect2.getSize().x == 0.f || rect2.getSize().y == 0.f) return false;
+
+    sf::FloatRect bounds1 = rect1.getGlobalBounds();
+    sf::FloatRect bounds2 = rect2.getGlobalBounds();
+
+    return bounds1.intersects(bounds2);
+}
+
 void updatePlayer() {
     playerSprite.setTexture(textures[0]);
     playerCurrentSpeed *= playerFriction;
@@ -175,6 +277,24 @@ void movePlayer(float direction) {
     playerCurrentSpeed.x += direction * playerSpeed * cos(angle);
     playerCurrentSpeed.y += direction * playerSpeed * sin(angle);
     playerSprite.setTexture(textures[1]);
+}
+
+void updatePlayer2() {
+    player2Sprite.setTexture(textures[0]);
+    player2CurrentSpeed *= player2Friction;
+    player2Sprite.move(player2CurrentSpeed);
+    teleportInSides(player2Sprite);
+    player2Hitbox.setPosition(player2Sprite.getPosition());
+    player2Hitbox.setRotation(player2Sprite.getRotation());
+}
+
+void rotatePlayer2(float direction) { player2Sprite.rotate(direction * player2RotationSpeed); }
+
+void movePlayer2(float direction) {
+    float angle = (player2Sprite.getRotation() - 90) * M_PI / 180.f;
+    player2CurrentSpeed.x += direction * player2Speed * cos(angle);
+    player2CurrentSpeed.y += direction * player2Speed * sin(angle);
+    player2Sprite.setTexture(textures[1]);
 }
 
 void shoot() {
@@ -199,6 +319,32 @@ void shoot() {
     bulletSpeeds.push_back(bulletSpeed);
     bulletHitboxes.push_back(bulletHitbox);
     bulletTimers.push_back(60);
+    bulletOwners.push_back(1);
+}
+
+void shoot2() {
+    sf::Sprite newBullet;
+    newBullet.setTexture(textures[2]);
+    newBullet.setOrigin(64.f, 64.f);
+    newBullet.setPosition(player2Sprite.getPosition());
+    newBullet.setScale(0.1f, 0.1f);
+
+    float angle = (player2Sprite.getRotation() - 90) * M_PI / 180.f;
+    sf::Vector2f bulletSpeed(cos(angle) * 10.f, sin(angle) * 10.f);
+
+    sf::CircleShape bulletHitbox;
+    bulletHitbox.setRadius(bulletRadius);
+    bulletHitbox.setOrigin(bulletRadius, bulletRadius);
+    bulletHitbox.setPosition(player2Sprite.getPosition());
+    bulletHitbox.setFillColor(sf::Color::Cyan);
+    bulletHitbox.setOutlineColor(sf::Color::Blue);
+    bulletHitbox.setOutlineThickness(1.f);
+
+    bullets.push_back(newBullet);
+    bulletSpeeds.push_back(bulletSpeed);
+    bulletHitboxes.push_back(bulletHitbox);
+    bulletTimers.push_back(60);
+    bulletOwners.push_back(2);
 }
 
 void updateBullets() {
@@ -286,18 +432,30 @@ void updateAsteroids() {
     }
 }
 
-void removeAsteroid(size_t index) {
+void removeAsteroid(size_t index, int owner) {
     if (asteroids[index].getScale().x == asteroidScale) {
         spawnAsteroid(asteroidRadius2, asteroids[index]);
         spawnAsteroid(asteroidRadius2, asteroids[index]);
-        score += 20;
+        if (owner == 1) {
+            score += 20;
+        } else {
+            score2 += 20;
+        }
 
     } else if (asteroids[index].getScale().x == asteroidScale / 2.f) {
         spawnAsteroid(asteroidRadius3, asteroids[index]);
         spawnAsteroid(asteroidRadius3, asteroids[index]);
-        score += 50;
+        if (owner == 1) {
+            score += 50;
+        } else {
+            score2 += 50;
+        }
     } else {
-        score += 100;
+        if (owner == 1) {
+            score += 100;
+        } else {
+            score2 += 100;
+        }
     }
 
     asteroids.erase(asteroids.begin() + index);
@@ -309,7 +467,7 @@ void checkAsteroidCollisions() {
         for (int j = bullets.size() - 1; j >= 0; j--) {
             if (checkCollision(asteroidHitboxes[i], bulletHitboxes[j])) {
                 removeBullet(j);
-                removeAsteroid(i);
+                removeAsteroid(i, bulletOwners[j]);
                 break;
             }
         }
@@ -319,17 +477,73 @@ void checkAsteroidCollisions() {
 bool checkPlayerCollisions() {
     for (size_t i = 0; i < asteroids.size(); i++) {
         if (checkCollision(playerHitbox, asteroidHitboxes[i])) {
-            removeAsteroid(i);
+            removeAsteroid(i, 1);
             playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
             playerSprite.setScale(sf::Vector2f(0.f, 0.f));
             std::cout << "Colisión detectada con el asteroide" << std::endl;
             playerRespawning = 120;
-            lives--;
             return true;
-            break;
         }
     }
     return false;
+}
+
+bool checkPlayer2Collisions() {
+    for (size_t i = 0; i < asteroids.size(); i++) {
+        if (checkCollision(player2Hitbox, asteroidHitboxes[i])) {
+            removeAsteroid(i, 2);
+            player2Hitbox.setSize(sf::Vector2f(0.f, 0.f));
+            player2Sprite.setScale(sf::Vector2f(0.f, 0.f));
+            std::cout << "Colisión detectada con el asteroide" << std::endl;
+            player2Respawning = 120;
+            return true;
+        }
+    }
+    return false;
+}
+
+void checkBulletPlayerCollisions() {
+    for (int i = bullets.size() - 1; i >= 0; i--) {
+        if (bulletOwners[i] == 2 && lives > 0 && playerRespawning == -1) {
+            if (checkCollision(playerHitbox, bulletHitboxes[i])) {
+                removeBullet(i);
+                playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
+                playerSprite.setScale(sf::Vector2f(0.f, 0.f));
+                std::cout << "P1 golpeado por P2!" << std::endl;
+                playerRespawning = 120;
+                lives--;
+                score2 += 500;
+            }
+        } else if (bulletOwners[i] == 1 && lives2 > 0 && player2Respawning == -1) {
+            if (checkCollision(player2Hitbox, bulletHitboxes[i])) {
+                removeBullet(i);
+                player2Hitbox.setSize(sf::Vector2f(0.f, 0.f));
+                player2Sprite.setScale(sf::Vector2f(0.f, 0.f));
+                std::cout << "P2 golpeado por P1!" << std::endl;
+                player2Respawning = 120;
+                lives2--;
+                score += 500;
+            }
+        }
+    }
+}
+
+void checkPlayerPlayerCollisions() {
+    if (lives > 0 && lives2 > 0 && playerRespawning == -1 && player2Respawning == -1) {
+        if (checkCollision(playerHitbox, player2Hitbox)) {
+            std::cout << "Colisión entre jugadores!" << std::endl;
+
+            playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
+            playerSprite.setScale(sf::Vector2f(0.f, 0.f));
+            playerRespawning = 120;
+            lives--;
+
+            player2Hitbox.setSize(sf::Vector2f(0.f, 0.f));
+            player2Sprite.setScale(sf::Vector2f(0.f, 0.f));
+            player2Respawning = 120;
+            lives2--;
+        }
+    }
 }
 
 void render(sf::RenderWindow& window) {
@@ -349,10 +563,22 @@ void render(sf::RenderWindow& window) {
 
         window.draw(startButton);
         window.draw(startButtonText);
-    } else if (lives > 0) {
+        window.draw(player2Button);
+        window.draw(player2ButtonText);
+        window.draw(vsModeButton);
+        window.draw(vsModeButtonText);
+    } else if (lives > 0 || lives2 > 0) {
         window.clear(sf::Color::Black);
-        window.draw(playerSprite);
-        window.draw(playerHitbox);
+
+        if (lives > 0) {
+            window.draw(playerSprite);
+            window.draw(playerHitbox);
+        }
+
+        if (lives2 > 0 && currentMode == TWO_PLAYERS) {
+            window.draw(player2Sprite);
+            window.draw(player2Hitbox);
+        }
 
         for (size_t i = 0; i < bullets.size(); i++) {
             window.draw(bullets[i]);
@@ -365,8 +591,18 @@ void render(sf::RenderWindow& window) {
 
         window.draw(scoreText);
 
+        if (currentMode == TWO_PLAYERS) {
+            window.draw(scoreText2);
+        }
+
         for (int i = 0; i < lives; i++) {
             window.draw(livesSprites[i]);
+        }
+
+        if (currentMode == TWO_PLAYERS) {
+            for (int i = 0; i < lives2; i++) {
+                window.draw(livesSprites2[i]);
+            }
         }
 
     } else {
@@ -420,7 +656,25 @@ int main() {
                     sf::Vector2i mousePos = sf::Mouse::getPosition(window);
                     if (startButton.getGlobalBounds().contains(
                             static_cast<sf::Vector2f>(mousePos))) {
+                        lives = 3;
+                        currentMode = SINGLE_PLAYER;
                         initializePlayer();
+                    } else if (player2Button.getGlobalBounds().contains(
+                                   static_cast<sf::Vector2f>(mousePos))) {
+                        lives = 3;
+                        lives2 = 3;
+                        currentMode = TWO_PLAYERS;
+                        vsMode = false;
+                        initializePlayer();
+                        initializePlayer2();
+                    } else if (vsModeButton.getGlobalBounds().contains(
+                                   static_cast<sf::Vector2f>(mousePos))) {
+                        lives = 3;
+                        lives2 = 3;
+                        currentMode = TWO_PLAYERS;
+                        vsMode = true;
+                        initializePlayer();
+                        initializePlayer2();
                     }
                 }
             }
@@ -432,49 +686,106 @@ int main() {
                 startButton.setFillColor(sf::Color(100, 100, 100));
             }
 
+            if (player2Button.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                player2Button.setFillColor(sf::Color(150, 150, 150));
+            } else {
+                player2Button.setFillColor(sf::Color(100, 100, 100));
+            }
+
+            if (vsModeButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                vsModeButton.setFillColor(sf::Color(150, 150, 150));
+            } else {
+                vsModeButton.setFillColor(sf::Color(100, 100, 100));
+            }
+
             render(window);
-        } else if (lives > 0) {
+        } else if (lives > 0 || lives2 > 0) {
             sf::Event event;
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed) window.close();
             }
 
-            updatePlayer();
+            if (lives > 0) {
+                updatePlayer();
 
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
-                rotatePlayer(-1.f);
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
+                    rotatePlayer(-1.f);
+                }
+
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
+                    rotatePlayer(+1.f);
+                }
+
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
+                    movePlayer(1.f);
+                }
+
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
+                    movePlayer(-1.f);
+                }
+
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && bulletCD == 0 &&
+                    playerRespawning == -1) {
+                    bulletCD = 15;
+                    std::cout << "Disparo P1" << std::endl;
+                    shoot();
+                }
+
+                if (bulletCD > 0) bulletCD--;
+
+                if (playerRespawning > 0) playerRespawning--;
+                if (playerRespawning == 0) initializePlayer();
+
+                scoreText.setString("P1: " + std::to_string(score));
+                if (checkPlayerCollisions()) lives--;
             }
 
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
-                rotatePlayer(+1.f);
-            }
+            if (lives2 > 0 && currentMode == TWO_PLAYERS) {
+                updatePlayer2();
 
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
-                movePlayer(1.f);
-            }
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+                    rotatePlayer2(-1.f);
+                }
 
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
-                movePlayer(-1.f);
-            }
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+                    rotatePlayer2(+1.f);
+                }
 
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && bulletCD == 0) {
-                bulletCD = 15;
-                std::cout << "Disparo" << std::endl;
-                shoot();
-            }
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+                    movePlayer2(1.f);
+                }
 
-            if (bulletCD > 0) bulletCD--;
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+                    movePlayer2(-1.f);
+                }
+
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) && bullet2CD == 0 &&
+                    player2Respawning == -1) {
+                    bullet2CD = 15;
+                    std::cout << "Disparo P2" << std::endl;
+                    shoot2();
+                }
+
+                if (bullet2CD > 0) bullet2CD--;
+
+                if (player2Respawning > 0) player2Respawning--;
+                if (player2Respawning == 0) initializePlayer2();
+
+                scoreText2.setString("P2: " + std::to_string(score2));
+                if (checkPlayer2Collisions()) lives2--;
+            }
 
             if (asteroids.empty()) {
                 for (int i = 0; i < 5; i++) spawnAsteroid(asteroidRadius1);
             }
 
-            if (playerRespawning > 0) playerRespawning--;
-            if (playerRespawning == 0) initializePlayer();
-
-            scoreText.setString(std::to_string(score));
             checkAsteroidCollisions();
-            checkPlayerCollisions();
+
+            if (vsMode) {
+                checkBulletPlayerCollisions();
+                checkPlayerPlayerCollisions();
+            }
+
             updateBullets();
             updateAsteroids();
             removeBullets();
@@ -489,8 +800,10 @@ int main() {
                     sf::Vector2i mousePos = sf::Mouse::getPosition(window);
                     if (restartButton.getGlobalBounds().contains(
                             static_cast<sf::Vector2f>(mousePos))) {
-                        lives = 3;
+                        lives = -1;
+                        lives2 = -1;
                         score = 0;
+                        score2 = 0;
                         asteroids.clear();
                         asteroidSpeeds.clear();
                         asteroidHitboxes.clear();
@@ -498,7 +811,11 @@ int main() {
                         bulletSpeeds.clear();
                         bulletHitboxes.clear();
                         bulletTimers.clear();
+                        bulletOwners.clear();
                         initializePlayer();
+                        if (currentMode == TWO_PLAYERS) {
+                            initializePlayer2();
+                        }
                     }
                 }
             }
