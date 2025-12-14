@@ -541,7 +541,7 @@ void aiThink() {
             }
         }
 
-        if (aiThinkTimer > aiThinkInterval / 2) {
+        if (aiThinkTimer <= aiThinkInterval / 2) {
             // Moverse hacia adelante si está apuntando bien
             if (std::abs(angleDiff) < 30.f) {
                 movePlayer2(1.f);
