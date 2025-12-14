@@ -5,9 +5,12 @@
 #include <cmath>
 #include <vector>
 
-enum GameMode { MENU, SINGLE_PLAYER, TWO_PLAYERS, VS_AI, PLAYING, GAME_OVER };
+enum GameMode { MENU, SINGLE_PLAYER, TWO_PLAYERS, VS_AI, DIFFICULTY_SELECT, PLAYING, GAME_OVER };
 GameMode currentMode = MENU;
 bool vsMode = false;
+
+enum AIDifficulty { AI_EASY, AI_MEDIUM, AI_HARD };
+AIDifficulty aiDifficulty = AI_EASY;
 
 struct Wave {
     int numBigAsteroids;
@@ -52,8 +55,12 @@ int player2Respawning = -1;
 int player2Invulnerable = 0;
 sf::RectangleShape player2Hitbox;
 bool isAI = false;
+
 float aiThinkTimer = 0.f;
-sf::Vector2f aiTargetPos;
+float aiThinkInterval = 60.f;
+float aiVisionRange = 600.f;
+int aiTargetIndex = -1;
+sf::CircleShape aiVisionCircle;
 
 sf::Texture textures[5];
 sf::Vector2f screenSize(1400.f, 900.f);
@@ -97,6 +104,14 @@ sf::Text vsModeButtonText;
 sf::RectangleShape vsAIButton;
 sf::Text vsAIButtonText;
 
+sf::RectangleShape easyButton;
+sf::Text easyButtonText;
+sf::RectangleShape mediumButton;
+sf::Text mediumButtonText;
+sf::RectangleShape hardButton;
+sf::Text hardButtonText;
+sf::Text difficultyTitleText;
+
 sf::Text titleText;
 sf::Text gameoverText;
 sf::Text finalScoreText;
@@ -104,10 +119,14 @@ sf::Text finalScoreText;
 int score = 0;
 int score2 = 0;
 
+// Se declaran las funciones para poder llamarlas desde otras funciones antes de su definición
 bool checkPlayerCollisions();
 bool checkPlayer2Collisions();
 void checkBulletPlayerCollisions();
 void checkPlayerPlayerCollisions();
+void shoot2();
+void rotatePlayer2(float direction);
+void movePlayer2(float direction);
 
 void initializePlayer() {
     textures[0].loadFromFile("images/sprite.png");
@@ -280,6 +299,66 @@ void initializeButtons() {
     vsAIButtonText.setOrigin(vsAIBounds.left + vsAIBounds.width / 2.f,
                              vsAIBounds.top + vsAIBounds.height / 2.f);
     vsAIButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 335.f);
+
+    aiVisionCircle.setRadius(aiVisionRange);
+    aiVisionCircle.setOrigin(aiVisionRange, aiVisionRange);
+    aiVisionCircle.setFillColor(sf::Color::Transparent);
+    aiVisionCircle.setOutlineColor(sf::Color(255, 255, 0, 100));
+    aiVisionCircle.setOutlineThickness(2.f);
+
+    easyButton.setSize(sf::Vector2f(250.f, 70.f));
+    easyButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 50.f);
+    easyButton.setFillColor(sf::Color(0, 150, 0));
+    easyButton.setOutlineColor(sf::Color::White);
+    easyButton.setOutlineThickness(3.f);
+
+    easyButtonText.setFont(font);
+    easyButtonText.setString("FACIL");
+    easyButtonText.setCharacterSize(32);
+    easyButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect easyBounds = easyButtonText.getLocalBounds();
+    easyButtonText.setOrigin(easyBounds.left + easyBounds.width / 2.f,
+                             easyBounds.top + easyBounds.height / 2.f);
+    easyButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 85.f);
+
+    mediumButton.setSize(sf::Vector2f(250.f, 70.f));
+    mediumButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 150.f);
+    mediumButton.setFillColor(sf::Color(200, 150, 0));
+    mediumButton.setOutlineColor(sf::Color::White);
+    mediumButton.setOutlineThickness(3.f);
+
+    mediumButtonText.setFont(font);
+    mediumButtonText.setString("MEDIO");
+    mediumButtonText.setCharacterSize(32);
+    mediumButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect mediumBounds = mediumButtonText.getLocalBounds();
+    mediumButtonText.setOrigin(mediumBounds.left + mediumBounds.width / 2.f,
+                               mediumBounds.top + mediumBounds.height / 2.f);
+    mediumButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 185.f);
+
+    hardButton.setSize(sf::Vector2f(250.f, 70.f));
+    hardButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 250.f);
+    hardButton.setFillColor(sf::Color(200, 0, 0));
+    hardButton.setOutlineColor(sf::Color::White);
+    hardButton.setOutlineThickness(3.f);
+
+    hardButtonText.setFont(font);
+    hardButtonText.setString("DIFICIL");
+    hardButtonText.setCharacterSize(32);
+    hardButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect hardBounds = hardButtonText.getLocalBounds();
+    hardButtonText.setOrigin(hardBounds.left + hardBounds.width / 2.f,
+                             hardBounds.top + hardBounds.height / 2.f);
+    hardButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 285.f);
+
+    difficultyTitleText.setFont(font);
+    difficultyTitleText.setString("SELECCIONA DIFICULTAD");
+    difficultyTitleText.setCharacterSize(48);
+    difficultyTitleText.setFillColor(sf::Color::White);
+    sf::FloatRect diffTitleBounds = difficultyTitleText.getLocalBounds();
+    difficultyTitleText.setOrigin(diffTitleBounds.left + diffTitleBounds.width / 2.f,
+                                  diffTitleBounds.top + diffTitleBounds.height / 2.f);
+    difficultyTitleText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f - 100.f);
 }
 
 void initializeUfo() {
@@ -413,6 +492,71 @@ void movePlayer2(float direction) {
     player2CurrentSpeed.x += direction * player2Speed * cos(angle);
     player2CurrentSpeed.y += direction * player2Speed * sin(angle);
     player2Sprite.setTexture(textures[1]);
+}
+
+void aiThink() {
+    // Buscar nuevo objetivo cada vez que se llama
+    float closestDistanceSquared = aiVisionRange * aiVisionRange;
+    aiTargetIndex = -1;
+
+    sf::Vector2f aiPos = player2Sprite.getPosition();
+
+    for (size_t i = 0; i < asteroids.size(); i++) {
+        sf::Vector2f asteroidPos = asteroids[i].getPosition();
+        float dx = asteroidPos.x - aiPos.x;
+        float dy = asteroidPos.y - aiPos.y;
+        float distanceSquared = dx * dx + dy * dy;
+
+        if (distanceSquared < closestDistanceSquared) {
+            closestDistanceSquared = distanceSquared;
+            aiTargetIndex = i;
+        }
+    }
+
+    // Si hay un objetivo válido, moverse hacia él
+    if (aiTargetIndex != -1 && aiTargetIndex < asteroids.size()) {
+        sf::Vector2f targetPos = asteroids[aiTargetIndex].getPosition();
+
+        // Calcular ángulo hacia el objetivo
+        float dx = targetPos.x - aiPos.x;
+        float dy = targetPos.y - aiPos.y;
+        float angleToTarget = std::atan2(dy, dx) * 180.f / M_PI + 90.f;
+
+        // Ángulo actual de la IA
+        float currentAngle = player2Sprite.getRotation();
+
+        // Calcular diferencia de ángulo
+        float angleDiff = angleToTarget - currentAngle;
+
+        // Normalizar a [-180, 180]
+        while (angleDiff > 180.f) angleDiff -= 360.f;
+        while (angleDiff < -180.f) angleDiff += 360.f;
+
+        // Girar
+        if (std::abs(angleDiff) > 5.f) {
+            if (angleDiff > 0) {
+                rotatePlayer2(1.f);
+            } else {
+                rotatePlayer2(-1.f);
+            }
+        }
+
+        if (aiThinkTimer > aiThinkInterval / 2) {
+            // Moverse hacia adelante si está apuntando bien
+            if (std::abs(angleDiff) < 30.f) {
+                movePlayer2(1.f);
+            }
+        }
+
+        // std::cout << "IA P2: " << aiThinkTimer << std::endl;
+        if (aiThinkTimer == 0) {
+            // Disparar si está apuntando al objetivo
+            if (std::abs(angleDiff) < 30.f && bullet2CD == 0 && player2Respawning == -1) {
+                shoot2();
+                bullet2CD = 15 + aiThinkInterval;
+            }
+        }
+    }
 }
 
 void shoot() {
@@ -661,7 +805,7 @@ bool checkPlayerCollisions() {
             removeAsteroid(i, 1);
             playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
             playerSprite.setScale(sf::Vector2f(0.f, 0.f));
-            std::cout << "Colisión detectada con el asteroide" << std::endl;
+            // std::cout << "Colisión detectada con el asteroide" << std::endl;
             playerRespawning = 120;
             playerInvulnerable = 0;
             return true;
@@ -672,7 +816,7 @@ bool checkPlayerCollisions() {
             removeUfo(i);
             playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
             playerSprite.setScale(sf::Vector2f(0.f, 0.f));
-            std::cout << "Colisión detectada con el asteroide" << std::endl;
+            // std::cout << "Colisión detectada con el asteroide" << std::endl;
             playerRespawning = 120;
             playerInvulnerable = 0;
             return true;
@@ -689,7 +833,7 @@ bool checkPlayer2Collisions() {
             removeAsteroid(i, 2);
             player2Hitbox.setSize(sf::Vector2f(0.f, 0.f));
             player2Sprite.setScale(sf::Vector2f(0.f, 0.f));
-            std::cout << "Colisión detectada con el asteroide" << std::endl;
+            // std::cout << "Colisión detectada con el asteroide" << std::endl;
             player2Respawning = 120;
             player2Invulnerable = 0;
             return true;
@@ -700,7 +844,7 @@ bool checkPlayer2Collisions() {
             removeUfo(i);
             playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
             playerSprite.setScale(sf::Vector2f(0.f, 0.f));
-            std::cout << "Colisión detectada con el asteroide" << std::endl;
+            // std::cout << "Colisión detectada con el asteroide" << std::endl;
             playerRespawning = 120;
             playerInvulnerable = 0;
             return true;
@@ -717,10 +861,10 @@ void checkBulletPlayerCollisions() {
                 playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
                 playerSprite.setScale(sf::Vector2f(0.f, 0.f));
                 if (bulletOwners[i] == 2) {
-                    std::cout << "P1 golpeado por P2!" << std::endl;
+                    // std::cout << "P1 golpeado por P2!" << std::endl;
                     score2 += 500;
                 } else {
-                    std::cout << "P1 golpeado por UFO!" << std::endl;
+                    // std::cout << "P1 golpeado por UFO!" << std::endl;
                 }
                 playerRespawning = 120;
                 playerInvulnerable = 0;
@@ -729,17 +873,17 @@ void checkBulletPlayerCollisions() {
                 break;
             }
         }
-        // Balas del jugador 1 o UFO golpeando al jugador 2
+
         else if ((bulletOwners[i] == 1 || bulletOwners[i] == 3) && lives2 > 0 &&
                  player2Respawning == -1 && player2Invulnerable == 0) {
             if (checkCollision(player2Hitbox, bulletHitboxes[i])) {
                 player2Hitbox.setSize(sf::Vector2f(0.f, 0.f));
                 player2Sprite.setScale(sf::Vector2f(0.f, 0.f));
                 if (bulletOwners[i] == 1) {
-                    std::cout << "P2 golpeado por P1!" << std::endl;
+                    // std::cout << "P2 golpeado por P1!" << std::endl;
                     score += 500;
                 } else {
-                    std::cout << "P2 golpeado por UFO!" << std::endl;
+                    // std::cout << "P2 golpeado por UFO!" << std::endl;
                 }
                 player2Respawning = 120;
                 player2Invulnerable = 0;
@@ -755,7 +899,7 @@ void checkPlayerPlayerCollisions() {
     if (lives > 0 && lives2 > 0 && playerRespawning == -1 && player2Respawning == -1 &&
         playerInvulnerable == 0 && player2Invulnerable == 0) {
         if (checkCollision(playerHitbox, player2Hitbox)) {
-            std::cout << "Colisión entre jugadores!" << std::endl;
+            // std::cout << "Colisión entre jugadores!" << std::endl;
 
             playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
             playerSprite.setScale(sf::Vector2f(0.f, 0.f));
@@ -790,7 +934,18 @@ void checkBulletUfoCollisions() {
 }
 
 void render(sf::RenderWindow& window) {
-    if (lives == -1) {
+    if (currentMode == DIFFICULTY_SELECT) {
+        window.clear(sf::Color::Black);
+
+        window.draw(difficultyTitleText);
+
+        window.draw(easyButton);
+        window.draw(easyButtonText);
+        window.draw(mediumButton);
+        window.draw(mediumButtonText);
+        window.draw(hardButton);
+        window.draw(hardButtonText);
+    } else if (lives == -1) {
         window.clear(sf::Color::Black);
 
         window.draw(titleText);
@@ -818,6 +973,11 @@ void render(sf::RenderWindow& window) {
             if (player2Invulnerable == 0 || (player2Invulnerable / 10) % 2 == 0) {
                 window.draw(player2Sprite);
                 // window.draw(player2Hitbox);
+            }
+
+            if (isAI) {
+                aiVisionCircle.setPosition(player2Sprite.getPosition());
+                window.draw(aiVisionCircle);
             }
         }
 
@@ -853,11 +1013,13 @@ void render(sf::RenderWindow& window) {
 
     } else if (currentMode == GAME_OVER) {
         window.clear(sf::Color::Black);
-        if (lives2 > 0) {
+        if (lives2 >= 0) {
             if (score > score2) {
                 finalScoreText.setString("Ganador: P1\n Puntaje: " + std::to_string(score));
             } else {
-                finalScoreText.setString("Ganador: P2\n Puntaje: " + std::to_string(score2));
+                std::string winnerName = isAI ? "IA" : "P2";
+                finalScoreText.setString("Ganador: " + winnerName +
+                                         "\n Puntaje: " + std::to_string(score2));
             }
         } else {
             finalScoreText.setString("Puntaje Final: " + std::to_string(score));
@@ -885,77 +1047,141 @@ int main() {
     }
     initializeButtons();
     initializeTexts();
+    currentMode = MENU;
 
     while (window.isOpen()) {
         if (lives == -1) {
             sf::Event event;
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed) window.close();
+                if (currentMode == MENU) {
+                    if (event.type == sf::Event::MouseButtonReleased &&
+                        event.mouseButton.button == sf::Mouse::Left) {
+                        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                        if (startButton.getGlobalBounds().contains(
+                                static_cast<sf::Vector2f>(mousePos))) {
+                            lives = 3;
+                            currentMode = SINGLE_PLAYER;
+                            initializePlayer();
+                        } else if (player2Button.getGlobalBounds().contains(
+                                       static_cast<sf::Vector2f>(mousePos))) {
+                            lives = 3;
+                            lives2 = 3;
+                            currentMode = TWO_PLAYERS;
+                            vsMode = false;
+                            isAI = false;
+                            initializePlayer();
+                            initializePlayer2();
+                        } else if (vsModeButton.getGlobalBounds().contains(
+                                       static_cast<sf::Vector2f>(mousePos))) {
+                            lives = 3;
+                            lives2 = 3;
+                            currentMode = TWO_PLAYERS;
+                            vsMode = true;
+                            isAI = false;
+                            initializePlayer();
+                            initializePlayer2();
+                        } else if (vsAIButton.getGlobalBounds().contains(
+                                       static_cast<sf::Vector2f>(mousePos))) {
+                            currentMode = DIFFICULTY_SELECT;
+                        }
+                    }
 
-                if (event.type == sf::Event::MouseButtonReleased &&
-                    event.mouseButton.button == sf::Mouse::Left) {
-                    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                    if (startButton.getGlobalBounds().contains(
-                            static_cast<sf::Vector2f>(mousePos))) {
-                        lives = 3;
-                        currentMode = SINGLE_PLAYER;
-                        initializePlayer();
-                    } else if (player2Button.getGlobalBounds().contains(
-                                   static_cast<sf::Vector2f>(mousePos))) {
-                        lives = 3;
-                        lives2 = 3;
-                        currentMode = TWO_PLAYERS;
-                        vsMode = false;
-                        isAI = false;
-                        initializePlayer();
-                        initializePlayer2();
-                    } else if (vsModeButton.getGlobalBounds().contains(
-                                   static_cast<sf::Vector2f>(mousePos))) {
-                        lives = 3;
-                        lives2 = 3;
-                        currentMode = TWO_PLAYERS;
-                        vsMode = true;
-                        isAI = false;
-                        initializePlayer();
-                        initializePlayer2();
-                    } else if (vsAIButton.getGlobalBounds().contains(
-                                   static_cast<sf::Vector2f>(mousePos))) {
-                        lives = 3;
-                        lives2 = 3;
-                        currentMode = TWO_PLAYERS;
-                        vsMode = true;
-                        isAI = true;
-                        initializePlayer();
-                        initializePlayer2();
+                } else if (currentMode == DIFFICULTY_SELECT) {
+                    if (event.type == sf::Event::MouseButtonReleased &&
+                        event.mouseButton.button == sf::Mouse::Left) {
+                        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+
+                        if (easyButton.getGlobalBounds().contains(
+                                static_cast<sf::Vector2f>(mousePos))) {
+                            aiDifficulty = AI_EASY;
+                            aiThinkInterval = 10.f;
+                            lives = 3;
+                            lives2 = 3;
+                            currentMode = TWO_PLAYERS;
+                            vsMode = true;
+                            isAI = true;
+                            aiThinkTimer = aiThinkInterval;
+                            initializePlayer();
+                            initializePlayer2();
+                        } else if (mediumButton.getGlobalBounds().contains(
+                                       static_cast<sf::Vector2f>(mousePos))) {
+                            aiDifficulty = AI_MEDIUM;
+                            aiThinkInterval = 5.f;
+                            lives = 3;
+                            lives2 = 3;
+                            currentMode = TWO_PLAYERS;
+                            vsMode = true;
+                            isAI = true;
+                            aiThinkTimer = aiThinkInterval;
+                            initializePlayer();
+                            initializePlayer2();
+                        } else if (hardButton.getGlobalBounds().contains(
+                                       static_cast<sf::Vector2f>(mousePos))) {
+                            aiDifficulty = AI_HARD;
+                            aiThinkInterval = 1.f;
+                            lives = 3;
+                            lives2 = 3;
+                            currentMode = TWO_PLAYERS;
+                            vsMode = true;
+                            isAI = true;
+                            aiThinkTimer = aiThinkInterval;
+                            initializePlayer();
+                            initializePlayer2();
+                        }
                     }
                 }
             }
 
             sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-            if (startButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
-                startButton.setFillColor(sf::Color(150, 150, 150));
-            } else {
-                startButton.setFillColor(sf::Color(100, 100, 100));
+
+            if (currentMode == MENU) {
+                if (startButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                    startButton.setFillColor(sf::Color(150, 150, 150));
+                } else {
+                    startButton.setFillColor(sf::Color(70, 70, 70));
+                }
+
+                if (player2Button.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                    player2Button.setFillColor(sf::Color(150, 150, 150));
+                } else {
+                    player2Button.setFillColor(sf::Color(100, 100, 100));
+                }
+
+                if (vsModeButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                    vsModeButton.setFillColor(sf::Color(150, 150, 150));
+                } else {
+                    vsModeButton.setFillColor(sf::Color(100, 100, 100));
+                }
+
+                if (vsAIButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                    vsAIButton.setFillColor(sf::Color(150, 150, 150));
+                } else {
+                    vsAIButton.setFillColor(sf::Color(100, 100, 100));
+                }
             }
 
-            if (player2Button.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
-                player2Button.setFillColor(sf::Color(150, 150, 150));
-            } else {
-                player2Button.setFillColor(sf::Color(100, 100, 100));
+            else if (currentMode == DIFFICULTY_SELECT) {
+                if (easyButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                    easyButton.setFillColor(sf::Color(0, 200, 0));
+                } else {
+                    easyButton.setFillColor(sf::Color(0, 150, 0));
+                }
+
+                if (mediumButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                    mediumButton.setFillColor(sf::Color(255, 200, 0));
+                } else {
+                    mediumButton.setFillColor(sf::Color(200, 150, 0));
+                }
+
+                if (hardButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                    hardButton.setFillColor(sf::Color(255, 0, 0));
+                } else {
+                    hardButton.setFillColor(sf::Color(200, 0, 0));
+                }
             }
 
-            if (vsModeButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
-                vsModeButton.setFillColor(sf::Color(150, 150, 150));
-            } else {
-                vsModeButton.setFillColor(sf::Color(100, 100, 100));
-            }
-
-            if (vsAIButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
-                vsAIButton.setFillColor(sf::Color(150, 150, 150));
-            } else {
-                vsAIButton.setFillColor(sf::Color(100, 100, 100));
-            }
-
+            // std::cout << "Current mode: " << currentMode << std::endl;
         } else if (lives > 0 || lives2 > 0) {
             // GAME MAIN
             sf::Event event;
@@ -971,7 +1197,7 @@ int main() {
                 }
 
                 if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
-                    rotatePlayer(+1.f);
+                    rotatePlayer(1.f);
                 }
 
                 if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
@@ -985,7 +1211,7 @@ int main() {
                 if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && bulletCD == 0 &&
                     playerRespawning == -1) {
                     bulletCD = 15;
-                    std::cout << "Disparo P1" << std::endl;
+                    // std::cout << "Disparo P1" << std::endl;
                     shoot();
                 }
 
@@ -996,7 +1222,7 @@ int main() {
                 else if (ufoCD == 0) {
                     ufoCD = waves[currentWave].ufoCD;
                     initializeUfo();
-                    std::cout << "UFO" << std::endl;
+                    // std::cout << "UFO" << std::endl;
                 }
                 updateUfos();
 
@@ -1022,7 +1248,7 @@ int main() {
                     }
 
                     if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-                        rotatePlayer2(+1.f);
+                        rotatePlayer2(1.f);
                     }
 
                     if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
@@ -1036,11 +1262,15 @@ int main() {
                     if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) && bullet2CD == 0 &&
                         player2Respawning == -1) {
                         bullet2CD = 15;
-                        std::cout << "Disparo P2" << std::endl;
+                        // std::cout << "Disparo P2" << std::endl;
                         shoot2();
                     }
                 } else {
-                    // TODO: Aquí irá la lógica de la IA
+                    if (aiThinkTimer > 0) aiThinkTimer--;
+                    aiThink();
+                    if (aiThinkTimer == 0) {
+                        aiThinkTimer = aiThinkInterval;
+                    }
                 }
 
                 if (bullet2CD > 0) bullet2CD--;
@@ -1099,9 +1329,7 @@ int main() {
                         bulletTimers.clear();
                         bulletOwners.clear();
                         initializePlayer();
-                        if (currentMode == TWO_PLAYERS) {
-                            initializePlayer2();
-                        }
+                        currentMode = MENU;
                     }
                 }
             }
