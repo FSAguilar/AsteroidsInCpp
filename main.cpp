@@ -15,11 +15,14 @@ struct Wave {
     int numSmallAsteroids;
     float speedMultiplier;
     float scaleMultiplier;
+    int ufoCD;
+    float ufoSpeed;
 };
 
 Wave waves[] = {
-    {3, 0, 0, 1.0f, 1.0f}, {4, 2, 0, 1.1f, 1.1f}, {5, 3, 2, 1.2f, 1.2f},
-    {6, 4, 4, 1.3f, 1.3f}, {7, 5, 5, 1.4f, 1.4f}, {8, 6, 6, 1.5f, 1.5f},
+    {3, 0, 0, 1.0f, 1.0f, 600, 5.f},  {4, 2, 0, 1.1f, 1.1f, 550, 5.2f},
+    {5, 3, 2, 1.2f, 1.2f, 500, 5.4f}, {6, 4, 4, 1.3f, 1.3f, 450, 5.6f},
+    {7, 5, 5, 1.4f, 1.4f, 400, 5.8f}, {8, 6, 6, 1.5f, 1.5f, 350, 6.f},
 };
 
 int currentWave = 0;
@@ -52,8 +55,15 @@ bool isAI = false;
 float aiThinkTimer = 0.f;
 sf::Vector2f aiTargetPos;
 
-sf::Texture textures[4];
+sf::Texture textures[5];
 sf::Vector2f screenSize(1400.f, 900.f);
+
+int ufoCD = 600;
+std::vector<sf::Sprite> ufos;
+std::vector<bool> ufoDirections;
+std::vector<int> ufoShootCDs;
+float ufoScale = 0.3f;
+std::vector<sf::RectangleShape> ufoHitboxes;
 
 std::vector<sf::Sprite> bullets;
 std::vector<sf::Vector2f> bulletSpeeds;
@@ -84,6 +94,8 @@ sf::RectangleShape player2Button;
 sf::Text player2ButtonText;
 sf::RectangleShape vsModeButton;
 sf::Text vsModeButtonText;
+sf::RectangleShape vsAIButton;
+sf::Text vsAIButtonText;
 
 sf::Text titleText;
 sf::Text gameoverText;
@@ -102,6 +114,7 @@ void initializePlayer() {
     textures[1].loadFromFile("images/sprite_move.png");
     textures[2].loadFromFile("images/bullet.png");
     textures[3].loadFromFile("images/asteroid.png");
+    textures[4].loadFromFile("images/ufo.png");
 
     playerSprite.setTexture(textures[0]);
     playerSprite.setPosition(screenSize.x / 2.f, screenSize.y / 2.f);
@@ -252,6 +265,50 @@ void initializeButtons() {
     vsModeButtonText.setOrigin(vsModeBounds.left + vsModeBounds.width / 2.f,
                                vsModeBounds.top + vsModeBounds.height / 2.f);
     vsModeButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 235.f);
+
+    vsAIButton.setSize(sf::Vector2f(250.f, 70.f));
+    vsAIButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 300.f);
+    vsAIButton.setFillColor(sf::Color(70, 70, 70));
+    vsAIButton.setOutlineColor(sf::Color::White);
+    vsAIButton.setOutlineThickness(3.f);
+
+    vsAIButtonText.setFont(font);
+    vsAIButtonText.setString("VS IA");
+    vsAIButtonText.setCharacterSize(32);
+    vsAIButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect vsAIBounds = vsAIButtonText.getLocalBounds();
+    vsAIButtonText.setOrigin(vsAIBounds.left + vsAIBounds.width / 2.f,
+                             vsAIBounds.top + vsAIBounds.height / 2.f);
+    vsAIButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 335.f);
+}
+
+void initializeUfo() {
+    sf::Sprite ufoSprite;
+    sf::RectangleShape ufoHitbox;
+
+    ufoSprite.setTexture(textures[4]);
+    float diff = (float)(rand() % 25 - 50);
+    bool up = rand() % 2;
+    bool direction = rand() % 2;
+    if (up)
+        ufoSprite.setPosition(-100, screenSize.y / 4 + diff);
+    else
+        ufoSprite.setPosition(-100, screenSize.y * 3 / 4 - diff);
+    sf::Vector2u ufoSize = textures[4].getSize();
+    ufoSprite.setOrigin(ufoSize.x / 2.f, ufoSize.y / 2.f);
+    ufoSprite.setScale(ufoScale, ufoScale);
+    ufoSprite.setRotation(0.f);
+
+    ufoHitbox.setSize(sf::Vector2f(ufoSize.x * ufoScale, ufoSize.y * ufoScale));
+    ufoHitbox.setOrigin(ufoSize.x * ufoScale / 2.f, ufoSize.y * ufoScale / 2.f);
+    ufoHitbox.setFillColor(sf::Color::Transparent);
+    ufoHitbox.setOutlineColor(sf::Color::Red);
+    ufoHitbox.setOutlineThickness(1.f);
+
+    ufos.push_back(ufoSprite);
+    ufoHitboxes.push_back(ufoHitbox);
+    ufoDirections.push_back(direction);
+    ufoShootCDs.push_back(60);
 }
 
 void teleportInSides(sf::Sprite& sprite) {
@@ -277,25 +334,38 @@ bool checkCollision(sf::CircleShape& circle1, sf::CircleShape& circle2) {
     return distance < radiusSum;
 }
 
+/*
+ * 1. Obtener la transformación del rectángulo (incluye posición, rotación y escala)
+ * 2. Invertir la transformación para convertir coordenadas globales → locales
+ * 3. Transformar la posición del círculo al espacio local del rectángulo
+ * 4. Ahora el rectángulo está en (0,0) sin rotación, aplicamos AABB normal
+ * 5. Encontramos el punto más cercano del rectángulo al círculo
+ * 6. Si la distancia es menor que el radio, hay colisión
+ */
 bool checkCollision(sf::RectangleShape& rect, sf::CircleShape& circle) {
     if (rect.getSize().x == 0.f || rect.getSize().y == 0.f) return false;
-    sf::Vector2f rectPos = rect.getPosition();
+
+    sf::Transform transform = rect.getTransform();
+    sf::Transform inverseTransform = transform.getInverse();
+
+    sf::Vector2f localCirclePos = inverseTransform.transformPoint(circle.getPosition());
+
     sf::Vector2f rectSize = rect.getSize();
     sf::Vector2f rectOrigin = rect.getOrigin();
-    float rectLeft = rectPos.x - rectOrigin.x;
+    float rectLeft = -rectOrigin.x;
     float rectRight = rectLeft + rectSize.x;
-    float rectTop = rectPos.y - rectOrigin.y;
+    float rectTop = -rectOrigin.y;
     float rectBottom = rectTop + rectSize.y;
 
-    sf::Vector2f circlePos = circle.getPosition();
     float radius = circle.getRadius();
 
-    float closestX = std::max(rectLeft, std::min(circlePos.x, rectRight));
-    float closestY = std::max(rectTop, std::min(circlePos.y, rectBottom));
+    float closestX = std::max(rectLeft, std::min(localCirclePos.x, rectRight));
+    float closestY = std::max(rectTop, std::min(localCirclePos.y, rectBottom));
 
-    float dx = circlePos.x - closestX;
-    float dy = circlePos.y - closestY;
+    float dx = localCirclePos.x - closestX;
+    float dy = localCirclePos.y - closestY;
     float distanceSquared = dx * dx + dy * dy;
+
     return distanceSquared < (radius * radius);
 }
 
@@ -395,6 +465,42 @@ void shoot2() {
     bulletOwners.push_back(2);
 }
 
+void ufoShoot() {
+    for (size_t i = 0; i < ufos.size(); i++) {
+        if (ufoShootCDs[i] == 0) {
+            for (int j = 0; j < 4; j++) {
+                sf::Sprite newBullet;
+                newBullet.setTexture(textures[2]);
+                newBullet.setOrigin(64.f, 64.f);
+                newBullet.setPosition(ufos[i].getPosition());
+                newBullet.setScale(0.1f, 0.1f);
+
+                int direction = rand() % 4;
+
+                float angle = (direction * 90 - 45) * M_PI / 180.f;
+                sf::Vector2f bulletSpeed(cos(angle) * 10.f, sin(angle) * 10.f);
+
+                sf::CircleShape bulletHitbox;
+                bulletHitbox.setRadius(bulletRadius);
+                bulletHitbox.setOrigin(bulletRadius, bulletRadius);
+                bulletHitbox.setPosition(newBullet.getPosition());
+                bulletHitbox.setFillColor(sf::Color::Red);
+                bulletHitbox.setOutlineColor(sf::Color::Blue);
+                bulletHitbox.setOutlineThickness(1.f);
+
+                bullets.push_back(newBullet);
+                bulletSpeeds.push_back(bulletSpeed);
+                bulletHitboxes.push_back(bulletHitbox);
+                bulletTimers.push_back(60);
+                bulletOwners.push_back(3);
+                ufoShootCDs[i] = 30;
+            }
+        } else {
+            ufoShootCDs[i]--;
+        }
+    }
+}
+
 void updateBullets() {
     for (size_t i = 0; i < bullets.size(); i++) {
         bullets[i].move(bulletSpeeds[i]);
@@ -409,6 +515,7 @@ void removeBullet(size_t index) {
     bulletSpeeds.erase(bulletSpeeds.begin() + index);
     bulletHitboxes.erase(bulletHitboxes.begin() + index);
     bulletTimers.erase(bulletTimers.begin() + index);
+    bulletOwners.erase(bulletOwners.begin() + index);
 }
 
 void removeBullets() {
@@ -518,12 +625,28 @@ void removeAsteroid(size_t index, int owner) {
     asteroidSpeeds.erase(asteroidSpeeds.begin() + index);
     asteroidHitboxes.erase(asteroidHitboxes.begin() + index);
 }
+
+void updateUfos() {
+    for (size_t i = 0; i < ufos.size(); i++) {
+        ufos[i].move(waves[currentWave].ufoSpeed * (ufoDirections[i] ? 1 : -1), 0.f);
+        teleportInSides(ufos[i]);
+        ufoHitboxes[i].setPosition(ufos[i].getPosition());
+    }
+}
+
+void removeUfo(size_t index) {
+    ufos.erase(ufos.begin() + index);
+    ufoHitboxes.erase(ufoHitboxes.begin() + index);
+    ufoDirections.erase(ufoDirections.begin() + index);
+    ufoShootCDs.erase(ufoShootCDs.begin() + index);
+}
+
 void checkAsteroidCollisions() {
     for (int i = asteroids.size() - 1; i >= 0; i--) {
         for (int j = bullets.size() - 1; j >= 0; j--) {
-            if (checkCollision(asteroidHitboxes[i], bulletHitboxes[j])) {
-                removeBullet(j);
+            if (checkCollision(asteroidHitboxes[i], bulletHitboxes[j]) && bulletOwners[j] != 3) {
                 removeAsteroid(i, bulletOwners[j]);
+                removeBullet(j);
                 break;
             }
         }
@@ -536,6 +659,17 @@ bool checkPlayerCollisions() {
     for (size_t i = 0; i < asteroids.size(); i++) {
         if (checkCollision(playerHitbox, asteroidHitboxes[i])) {
             removeAsteroid(i, 1);
+            playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
+            playerSprite.setScale(sf::Vector2f(0.f, 0.f));
+            std::cout << "Colisión detectada con el asteroide" << std::endl;
+            playerRespawning = 120;
+            playerInvulnerable = 0;
+            return true;
+        }
+    }
+    for (size_t i = 0; i < ufos.size(); i++) {
+        if (checkCollision(playerHitbox, ufoHitboxes[i])) {
+            removeUfo(i);
             playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
             playerSprite.setScale(sf::Vector2f(0.f, 0.f));
             std::cout << "Colisión detectada con el asteroide" << std::endl;
@@ -561,34 +695,57 @@ bool checkPlayer2Collisions() {
             return true;
         }
     }
+    for (size_t i = 0; i < ufos.size(); i++) {
+        if (checkCollision(playerHitbox, ufoHitboxes[i])) {
+            removeUfo(i);
+            playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
+            playerSprite.setScale(sf::Vector2f(0.f, 0.f));
+            std::cout << "Colisión detectada con el asteroide" << std::endl;
+            playerRespawning = 120;
+            playerInvulnerable = 0;
+            return true;
+        }
+    }
     return false;
 }
 
 void checkBulletPlayerCollisions() {
     for (int i = bullets.size() - 1; i >= 0; i--) {
-        if (bulletOwners[i] == 2 && lives > 0 && playerRespawning == -1 &&
+        if ((bulletOwners[i] == 2 || bulletOwners[i] == 3) && lives > 0 && playerRespawning == -1 &&
             playerInvulnerable == 0) {
             if (checkCollision(playerHitbox, bulletHitboxes[i])) {
-                removeBullet(i);
                 playerHitbox.setSize(sf::Vector2f(0.f, 0.f));
                 playerSprite.setScale(sf::Vector2f(0.f, 0.f));
-                std::cout << "P1 golpeado por P2!" << std::endl;
+                if (bulletOwners[i] == 2) {
+                    std::cout << "P1 golpeado por P2!" << std::endl;
+                    score2 += 500;
+                } else {
+                    std::cout << "P1 golpeado por UFO!" << std::endl;
+                }
                 playerRespawning = 120;
                 playerInvulnerable = 0;
                 lives--;
-                score2 += 500;
-            }
-        } else if (bulletOwners[i] == 1 && lives2 > 0 && player2Respawning == -1 &&
-                   player2Invulnerable == 0) {
-            if (checkCollision(player2Hitbox, bulletHitboxes[i])) {
                 removeBullet(i);
+                break;
+            }
+        }
+        // Balas del jugador 1 o UFO golpeando al jugador 2
+        else if ((bulletOwners[i] == 1 || bulletOwners[i] == 3) && lives2 > 0 &&
+                 player2Respawning == -1 && player2Invulnerable == 0) {
+            if (checkCollision(player2Hitbox, bulletHitboxes[i])) {
                 player2Hitbox.setSize(sf::Vector2f(0.f, 0.f));
                 player2Sprite.setScale(sf::Vector2f(0.f, 0.f));
-                std::cout << "P2 golpeado por P1!" << std::endl;
+                if (bulletOwners[i] == 1) {
+                    std::cout << "P2 golpeado por P1!" << std::endl;
+                    score += 500;
+                } else {
+                    std::cout << "P2 golpeado por UFO!" << std::endl;
+                }
                 player2Respawning = 120;
                 player2Invulnerable = 0;
+                removeBullet(i);
                 lives2--;
-                score += 500;
+                break;
             }
         }
     }
@@ -615,6 +772,23 @@ void checkPlayerPlayerCollisions() {
     }
 }
 
+void checkBulletUfoCollisions() {
+    for (size_t i = 0; i < bullets.size(); i++) {
+        for (size_t j = 0; j < ufos.size(); j++) {
+            if (bulletOwners[i] != 3 && checkCollision(ufoHitboxes[j], bulletHitboxes[i])) {
+                removeUfo(j);
+                if (bulletOwners[i] == 1) {
+                    score += 250;
+                } else if (bulletOwners[i] == 2) {
+                    score2 += 250;
+                }
+                removeBullet(i);
+                break;
+            }
+        }
+    }
+}
+
 void render(sf::RenderWindow& window) {
     if (lives == -1) {
         window.clear(sf::Color::Black);
@@ -627,13 +801,16 @@ void render(sf::RenderWindow& window) {
         window.draw(player2ButtonText);
         window.draw(vsModeButton);
         window.draw(vsModeButtonText);
+        window.draw(vsAIButton);
+        window.draw(vsAIButtonText);
     } else if (lives > 0 || lives2 > 0) {
+        // GAME RENDER
         window.clear(sf::Color::Black);
 
         if (lives > 0) {
             if (playerInvulnerable == 0 || (playerInvulnerable / 10) % 2 == 0) {
                 window.draw(playerSprite);
-                // window.draw(playerHitbox);
+                window.draw(playerHitbox);
             }
         }
 
@@ -642,6 +819,11 @@ void render(sf::RenderWindow& window) {
                 window.draw(player2Sprite);
                 // window.draw(player2Hitbox);
             }
+        }
+
+        for (size_t i = 0; i < ufos.size(); i++) {
+            window.draw(ufos[i]);
+            // window.draw(ufoHitboxes[i]);
         }
 
         for (size_t i = 0; i < bullets.size(); i++) {
@@ -724,6 +906,7 @@ int main() {
                         lives2 = 3;
                         currentMode = TWO_PLAYERS;
                         vsMode = false;
+                        isAI = false;
                         initializePlayer();
                         initializePlayer2();
                     } else if (vsModeButton.getGlobalBounds().contains(
@@ -732,6 +915,16 @@ int main() {
                         lives2 = 3;
                         currentMode = TWO_PLAYERS;
                         vsMode = true;
+                        isAI = false;
+                        initializePlayer();
+                        initializePlayer2();
+                    } else if (vsAIButton.getGlobalBounds().contains(
+                                   static_cast<sf::Vector2f>(mousePos))) {
+                        lives = 3;
+                        lives2 = 3;
+                        currentMode = TWO_PLAYERS;
+                        vsMode = true;
+                        isAI = true;
                         initializePlayer();
                         initializePlayer2();
                     }
@@ -757,7 +950,14 @@ int main() {
                 vsModeButton.setFillColor(sf::Color(100, 100, 100));
             }
 
+            if (vsAIButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                vsAIButton.setFillColor(sf::Color(150, 150, 150));
+            } else {
+                vsAIButton.setFillColor(sf::Color(100, 100, 100));
+            }
+
         } else if (lives > 0 || lives2 > 0) {
+            // GAME MAIN
             sf::Event event;
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed) window.close();
@@ -791,6 +991,19 @@ int main() {
 
                 if (bulletCD > 0) bulletCD--;
 
+                if (ufoCD > 0)
+                    ufoCD--;
+                else if (ufoCD == 0) {
+                    ufoCD = waves[currentWave].ufoCD;
+                    initializeUfo();
+                    std::cout << "UFO" << std::endl;
+                }
+                updateUfos();
+
+                ufoShoot();
+
+                checkBulletUfoCollisions();
+
                 if (playerRespawning > 0) playerRespawning--;
                 if (playerRespawning == 0) initializePlayer();
 
@@ -803,27 +1016,31 @@ int main() {
             if (lives2 > 0 && currentMode == TWO_PLAYERS) {
                 updatePlayer2();
 
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
-                    rotatePlayer2(-1.f);
-                }
+                if (!isAI) {
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+                        rotatePlayer2(-1.f);
+                    }
 
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-                    rotatePlayer2(+1.f);
-                }
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+                        rotatePlayer2(+1.f);
+                    }
 
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
-                    movePlayer2(1.f);
-                }
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+                        movePlayer2(1.f);
+                    }
 
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
-                    movePlayer2(-1.f);
-                }
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+                        movePlayer2(-1.f);
+                    }
 
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) && bullet2CD == 0 &&
-                    player2Respawning == -1) {
-                    bullet2CD = 15;
-                    std::cout << "Disparo P2" << std::endl;
-                    shoot2();
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) && bullet2CD == 0 &&
+                        player2Respawning == -1) {
+                        bullet2CD = 15;
+                        std::cout << "Disparo P2" << std::endl;
+                        shoot2();
+                    }
+                } else {
+                    // TODO: Aquí irá la lógica de la IA
                 }
 
                 if (bullet2CD > 0) bullet2CD--;
@@ -849,7 +1066,7 @@ int main() {
 
             checkAsteroidCollisions();
 
-            if (vsMode) {
+            if (vsMode || isAI) {
                 checkBulletPlayerCollisions();
                 checkPlayerPlayerCollisions();
             }
