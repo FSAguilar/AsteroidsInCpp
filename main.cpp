@@ -41,7 +41,7 @@ Wave waves[] = {
 };
 
 int currentWave = 0;
-int maxWaves = 6;
+int maxWaves = sizeof(waves) / sizeof(waves[0]);
 
 sf::Sprite playerSprite;
 sf::Vector2f playerCurrentSpeed(0.f, 0.f);
