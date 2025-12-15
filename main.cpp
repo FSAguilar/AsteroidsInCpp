@@ -157,6 +157,9 @@ sf::Sound shootSound;
 sf::SoundBuffer deathBuffer;
 sf::Sound deathSound;
 
+sf::Music gameMusic;
+bool isMusicPlaying = false;
+
 // Se declaran las funciones para poder llamarlas desde otras funciones antes de su definición
 bool checkPlayerCollisions();
 bool checkPlayer2Collisions();
@@ -440,12 +443,17 @@ void initializeSounds() {
 
     if (shootBuffer.loadFromFile("audio/shoot.wav")) {
         shootSound.setBuffer(shootBuffer);
-        shootSound.setVolume(50.f);
+        shootSound.setVolume(25.f);
     }
 
     if (deathBuffer.loadFromFile("audio/death.wav")) {
         deathSound.setBuffer(deathBuffer);
         deathSound.setVolume(50.f);
+    }
+
+    if (gameMusic.openFromFile("audio/game_music.mp3")) {
+        gameMusic.setVolume(50.f);
+        gameMusic.setLoop(true);
     }
 }
 
@@ -1384,6 +1392,10 @@ int main() {
 
             // std::cout << "Current mode: " << currentMode << std::endl;
         } else if (currentMode == PAUSED) {
+            if (isMusicPlaying) {
+                gameMusic.pause();
+                isMusicPlaying = false;
+            }
             // std::cout << "PAUSED" << std::endl;
             sf::Event event;
             while (window.pollEvent(event)) {
@@ -1451,6 +1463,10 @@ int main() {
                 menuButton.setFillColor(sf::Color(70, 70, 70));
             }
         } else if (lives > 0 || lives2 > 0) {
+            if (!isMusicPlaying) {
+                gameMusic.play();
+                isMusicPlaying = true;
+            }
             // GAME MAIN
             sf::Event event;
             while (window.pollEvent(event)) {
@@ -1587,6 +1603,10 @@ int main() {
             if (instructionTimer > 0) instructionTimer--;
 
         } else {
+            if (isMusicPlaying) {
+                gameMusic.stop();
+                isMusicPlaying = false;
+            }
             currentMode = GAME_OVER;
             sf::Event event;
             while (window.pollEvent(event)) {

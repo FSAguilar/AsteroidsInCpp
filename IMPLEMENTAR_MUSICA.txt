@@ -1,0 +1,112 @@
+// ============================================
+// IMPLEMENTACIÓN SIMPLE: MÚSICA DURANTE EL JUEGO
+// ============================================
+
+// PASO 1: Ya está hecho ✓
+// - Declaración de backgroundMusic y musicPlaying
+// - Carga del archivo en initializeSounds()
+
+// PASO 2: INICIAR MÚSICA CUANDO COMIENZA EL JUEGO
+// Busca donde se inicializa el jugador al comenzar una partida
+// Por ejemplo, después de hacer clic en "Iniciar Partida" o "Jugador 2"
+// Agregar:
+
+backgroundMusic.play();
+
+// PASO 3: DETENER MÚSICA CUANDO TERMINA EL JUEGO
+// Busca donde currentMode cambia a GAME_OVER
+// Agregar:
+
+if (backgroundMusic.getStatus() == sf::Music::Playing) {
+    backgroundMusic.stop();
+}
+
+// PASO 4: PAUSAR MÚSICA CUANDO SE PAUSA EL JUEGO
+// Busca donde currentMode cambia a PAUSED
+// Agregar:
+
+backgroundMusic.pause();
+
+// PASO 5: REANUDAR MÚSICA AL DESPAUSAR
+// Busca donde se reanuda el juego desde PAUSED
+// Agregar:
+
+backgroundMusic.play();
+
+// ============================================
+// EJEMPLO COMPLETO PARA TU JUEGO
+// ============================================
+
+// En el botón de "Iniciar Partida" (alrededor de línea 1250):
+if (startButton.getGlobalBounds().contains(...)) {
+    buttonSound.play();
+    lives = 3;
+    currentMode = SINGLE_PLAYER;
+    initializePlayer();
+    backgroundMusic.play(); // ← AGREGAR AQUÍ
+}
+
+// En el botón de "Jugador 2" (alrededor de línea 1260):
+if (player2Button.getGlobalBounds().contains(...)) {
+    buttonSound.play();
+    lives = 3;
+    lives2 = 3;
+    currentMode = TWO_PLAYERS;
+    initializePlayer();
+    initializePlayer2();
+    backgroundMusic.play(); // ← AGREGAR AQUÍ
+}
+
+// Cuando el juego termina (busca donde se pone currentMode = GAME_OVER):
+currentMode = GAME_OVER;
+if (backgroundMusic.getStatus() == sf::Music::Playing) {
+    backgroundMusic.stop(); // ← AGREGAR AQUÍ
+}
+
+// Cuando se pausa (busca donde se detecta la tecla ESC):
+if (event.key.code == sf::Keyboard::Escape) {
+    currentMode = PAUSED;
+    backgroundMusic.pause(); // ← AGREGAR AQUÍ
+}
+
+// Cuando se reanuda (en el botón de "Reanudar"):
+if (resumeButton clicked) {
+    currentMode = TWO_PLAYERS; // o SINGLE_PLAYER
+    backgroundMusic.play(); // ← AGREGAR AQUÍ
+}
+
+// Cuando vuelve al menú desde pausa:
+if (menuButton clicked) {
+    // ... código de reset ...
+    currentMode = MENU;
+    if (backgroundMusic.getStatus() != sf::Music::Stopped) {
+        backgroundMusic.stop(); // ← AGREGAR AQUÍ
+    }
+}
+
+// ============================================
+// ALTERNATIVA: MÚSICA SOLO EN CIERTAS OLEADAS
+// ============================================
+
+// Si quieres que la música cambie o se active en oleadas específicas:
+if (currentWave == 3) { // Oleada 3
+    if (backgroundMusic.getStatus() != sf::Music::Playing) {
+        backgroundMusic.play();
+    }
+}
+
+if (currentWave == 5) { // Oleada 5 - música más intensa
+    backgroundMusic.setPitch(1.2f); // Más rápida
+    backgroundMusic.setVolume(50.f); // Más fuerte
+}
+
+// ============================================
+// NOTA IMPORTANTE
+// ============================================
+// Asegúrate de tener un archivo de música en:
+// d:\CODE\Cpp\Proyecto\audio\background.ogg
+//
+// Si no tienes uno, puedes:
+// 1. Descargar música libre de derechos de: freesound.org o incompetech.com
+// 2. Convertirla a .ogg usando Audacity o un convertidor online
+// 3. Colocarla en la carpeta audio/

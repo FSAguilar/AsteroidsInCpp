@@ -1,0 +1,163 @@
+// ============================================
+// GUÍA: CÓMO CONTROLAR LA MÚSICA DE FONDO
+// ============================================
+
+// Ya agregamos:
+// 1. sf::Music backgroundMusic;
+// 2. bool musicPlaying = false;
+// 3. Carga del archivo en initializeSounds()
+
+// EJEMPLOS DE CÓMO CONTROLAR LA MÚSICA BAJO DIFERENTES CONDICIONES:
+
+// ============================================
+// EJEMPLO 1: Reproducir música solo durante el juego
+// ============================================
+// En el loop principal, donde está "// GAME MAIN" (alrededor de línea 1300):
+
+if (lives > 0 || lives2 > 0) {
+    // Iniciar música si no está sonando
+    if (!musicPlaying) {
+        backgroundMusic.play();
+        musicPlaying = true;
+    }
+    
+    // ... resto del código del juego ...
+}
+
+// Y cuando el juego termina (en GAME_OVER):
+if (currentMode == GAME_OVER) {
+    // Detener música
+    if (musicPlaying) {
+        backgroundMusic.stop();
+        musicPlaying = false;
+    }
+}
+
+// ============================================
+// EJEMPLO 2: Reproducir música solo en el menú
+// ============================================
+// En el bloque del MENU:
+
+if (currentMode == MENU) {
+    if (!musicPlaying) {
+        backgroundMusic.play();
+        musicPlaying = true;
+    }
+} else {
+    if (musicPlaying) {
+        backgroundMusic.stop();
+        musicPlaying = false;
+    }
+}
+
+// ============================================
+// EJEMPLO 3: Pausar música cuando el juego está en pausa
+// ============================================
+// Cuando se pausa el juego:
+
+if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
+    currentMode = PAUSED;
+    backgroundMusic.pause(); // Pausa la música (se puede reanudar)
+}
+
+// Cuando se reanuda:
+if (resumeButton clicked) {
+    currentMode = TWO_PLAYERS; // o SINGLE_PLAYER
+    backgroundMusic.play(); // Reanuda desde donde se pausó
+}
+
+// ============================================
+// EJEMPLO 4: Diferentes músicas para diferentes modos
+// ============================================
+// Declarar múltiples músicas:
+sf::Music menuMusic;
+sf::Music gameMusic;
+sf::Music bossMusic;
+
+// Cambiar entre ellas:
+void switchToGameMusic() {
+    menuMusic.stop();
+    bossMusic.stop();
+    if (gameMusic.getStatus() != sf::Music::Playing) {
+        gameMusic.play();
+    }
+}
+
+// ============================================
+// EJEMPLO 5: Controlar volumen dinámicamente
+// ============================================
+// Bajar volumen gradualmente:
+float currentVolume = backgroundMusic.getVolume();
+if (currentVolume > 0) {
+    backgroundMusic.setVolume(currentVolume - 0.5f);
+}
+
+// Aumentar volumen:
+float currentVolume = backgroundMusic.getVolume();
+if (currentVolume < 100) {
+    backgroundMusic.setVolume(currentVolume + 0.5f);
+}
+
+// ============================================
+// MÉTODOS ÚTILES DE sf::Music
+// ============================================
+
+backgroundMusic.play();           // Reproducir
+backgroundMusic.pause();          // Pausar (se puede reanudar)
+backgroundMusic.stop();           // Detener (vuelve al inicio)
+backgroundMusic.setVolume(50.f);  // Volumen 0-100
+backgroundMusic.setLoop(true);    // Repetir en loop
+backgroundMusic.setPitch(1.5f);   // Cambiar velocidad (1.0 = normal)
+
+// Verificar estado:
+if (backgroundMusic.getStatus() == sf::Music::Playing) {
+    // La música está sonando
+}
+if (backgroundMusic.getStatus() == sf::Music::Paused) {
+    // La música está pausada
+}
+if (backgroundMusic.getStatus() == sf::Music::Stopped) {
+    // La música está detenida
+}
+
+// ============================================
+// RECOMENDACIÓN PARA TU JUEGO
+// ============================================
+// Te sugiero reproducir la música durante el juego activo:
+
+// En el loop principal, DESPUÉS de verificar que hay vidas:
+if (lives > 0 || lives2 > 0) {
+    // Iniciar música si no está sonando
+    if (backgroundMusic.getStatus() != sf::Music::Playing) {
+        backgroundMusic.play();
+    }
+    
+    // ... resto del código del juego ...
+}
+
+// Cuando el juego termina o vuelve al menú:
+if (currentMode == GAME_OVER || currentMode == MENU) {
+    if (backgroundMusic.getStatus() == sf::Music::Playing) {
+        backgroundMusic.stop();
+    }
+}
+
+// Cuando se pausa:
+if (currentMode == PAUSED) {
+    backgroundMusic.pause();
+}
+
+// ============================================
+// FORMATOS DE AUDIO SOPORTADOS
+// ============================================
+// SFML soporta: .ogg, .wav, .flac, .mp3 (limitado)
+// Recomendado: .ogg (mejor compresión y compatibilidad)
+// Para música de fondo: usa .ogg
+// Para efectos de sonido: usa .wav
+
+// ============================================
+// DÓNDE COLOCAR EL ARCHIVO DE AUDIO
+// ============================================
+// Coloca tu archivo de música en:
+// d:\CODE\Cpp\Proyecto\audio\background.ogg
+// (o el nombre que prefieras, solo cambia el nombre en el código)
