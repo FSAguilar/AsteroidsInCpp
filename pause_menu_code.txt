@@ -1,0 +1,40 @@
+void initializePauseMenu() {
+    pausedText.setFont(font);
+    pausedText.setString("PAUSA");
+    pausedText.setCharacterSize(60);
+    pausedText.setFillColor(sf::Color::White);
+    sf::FloatRect pausedBounds = pausedText.getLocalBounds();
+    pausedText.setOrigin(pausedBounds.left + pausedBounds.width / 2.f,
+                         pausedBounds.top + pausedBounds.height / 2.f);
+    pausedText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f - 150.f);
+
+    resumeButton.setSize(sf::Vector2f(250.f, 70.f));
+    resumeButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f);
+    resumeButton.setFillColor(sf::Color(70, 70, 70));
+    resumeButton.setOutlineColor(sf::Color::White);
+    resumeButton.setOutlineThickness(3.f);
+
+    resumeButtonText.setFont(font);
+    resumeButtonText.setString("Reanudar");
+    resumeButtonText.setCharacterSize(32);
+    resumeButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect resumeBounds = resumeButtonText.getLocalBounds();
+    resumeButtonText.setOrigin(resumeBounds.left + resumeBounds.width / 2.f,
+                               resumeBounds.top + resumeBounds.height / 2.f);
+    resumeButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 35.f);
+
+    menuButton.setSize(sf::Vector2f(250.f, 70.f));
+    menuButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 100.f);
+    menuButton.setFillColor(sf::Color(70, 70, 70));
+    menuButton.setOutlineColor(sf::Color::White);
+    menuButton.setOutlineThickness(3.f);
+
+    menuButtonText.setFont(font);
+    menuButtonText.setString("Volver al Menu");
+    menuButtonText.setCharacterSize(32);
+    menuButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect menuBounds = menuButtonText.getLocalBounds();
+    menuButtonText.setOrigin(menuBounds.left + menuBounds.width / 2.f,
+                             menuBounds.top + menuBounds.height / 2.f);
+    menuButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 135.f);
+}

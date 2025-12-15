@@ -1,11 +1,23 @@
+#include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 #include <iostream>
+
+#include "SFML/Audio/SoundBuffer.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <vector>
 
-enum GameMode { MENU, SINGLE_PLAYER, TWO_PLAYERS, VS_AI, DIFFICULTY_SELECT, PLAYING, GAME_OVER };
+enum GameMode {
+    MENU,
+    SINGLE_PLAYER,
+    TWO_PLAYERS,
+    VS_AI,
+    DIFFICULTY_SELECT,
+    PLAYING,
+    PAUSED,
+    GAME_OVER
+};
 GameMode currentMode = MENU;
 bool vsMode = false;
 
@@ -116,8 +128,34 @@ sf::Text titleText;
 sf::Text gameoverText;
 sf::Text finalScoreText;
 
+sf::Text InstructionsText1;
+sf::Text InstructionsText2;
+
+sf::RectangleShape resumeButton;
+sf::Text resumeButtonText;
+sf::RectangleShape menuButton;
+sf::Text menuButtonText;
+sf::Text pausedText;
+
+int instructionTimer = 180;
+
 int score = 0;
 int score2 = 0;
+
+sf::SoundBuffer startBuffer;
+sf::Sound startSound;
+
+sf::SoundBuffer buttonBuffer;
+sf::Sound buttonSound;
+
+sf::SoundBuffer respawnBuffer;
+sf::Sound respawnSound;
+
+sf::SoundBuffer shootBuffer;
+sf::Sound shootSound;
+
+sf::SoundBuffer deathBuffer;
+sf::Sound deathSound;
 
 // Se declaran las funciones para poder llamarlas desde otras funciones antes de su definición
 bool checkPlayerCollisions();
@@ -165,6 +203,9 @@ void initializePlayer() {
         livesSprites[i].setScale(playerScale, playerScale);
         livesSprites[i].setPosition(30.f + i * 40.f, 40.f);
     }
+
+    playerCurrentSpeed = sf::Vector2f(0.f, 0.f);
+    respawnSound.play();
 }
 
 void initializePlayer2() {
@@ -198,6 +239,8 @@ void initializePlayer2() {
         livesSprites2[i].setScale(player2Scale, player2Scale);
         livesSprites2[i].setPosition(screenSize.x - 30.f - i * 40.f, 40.f);
     }
+    player2CurrentSpeed = sf::Vector2f(0.f, 0.f);
+    respawnSound.play();
 }
 
 void initializeTexts() {
@@ -222,6 +265,24 @@ void initializeTexts() {
     finalScoreText.setFont(font);
     finalScoreText.setCharacterSize(36);
     finalScoreText.setFillColor(sf::Color::White);
+
+    InstructionsText1.setFont(font);
+    InstructionsText1.setString("JUGADOR 1\nFlechas: Mover\nEspacio: Disparar");
+    InstructionsText1.setCharacterSize(32);
+    InstructionsText1.setFillColor(sf::Color::White);
+    sf::FloatRect InstructionsBounds = InstructionsText1.getLocalBounds();
+    InstructionsText1.setOrigin(InstructionsBounds.left + InstructionsBounds.width / 2.f,
+                                InstructionsBounds.top + InstructionsBounds.height / 2.f);
+    InstructionsText1.setPosition(screenSize.x / 4.f, screenSize.y / 2.f);
+
+    InstructionsText2.setFont(font);
+    InstructionsText2.setString("JUGADOR 2\nW/A/S/D: Mover\nShift: Disparar");
+    InstructionsText2.setCharacterSize(32);
+    InstructionsText2.setFillColor(sf::Color::Cyan);
+    sf::FloatRect InstructionsBounds2 = InstructionsText2.getLocalBounds();
+    InstructionsText2.setOrigin(InstructionsBounds2.left + InstructionsBounds2.width / 2.f,
+                                InstructionsBounds2.top + InstructionsBounds2.height / 2.f);
+    InstructionsText2.setPosition(screenSize.x * 3.f / 4.f, screenSize.y / 2.f);
 }
 
 void initializeButtons() {
@@ -359,6 +420,74 @@ void initializeButtons() {
     difficultyTitleText.setOrigin(diffTitleBounds.left + diffTitleBounds.width / 2.f,
                                   diffTitleBounds.top + diffTitleBounds.height / 2.f);
     difficultyTitleText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f - 100.f);
+}
+
+void initializeSounds() {
+    if (startBuffer.loadFromFile("audio/start.wav")) {
+        startSound.setBuffer(startBuffer);
+        startSound.setVolume(50.f);
+    }
+
+    if (buttonBuffer.loadFromFile("audio/button.wav")) {
+        buttonSound.setBuffer(buttonBuffer);
+        buttonSound.setVolume(50.f);
+    }
+
+    if (respawnBuffer.loadFromFile("audio/respawn.wav")) {
+        respawnSound.setBuffer(respawnBuffer);
+        respawnSound.setVolume(50.f);
+    }
+
+    if (shootBuffer.loadFromFile("audio/shoot.wav")) {
+        shootSound.setBuffer(shootBuffer);
+        shootSound.setVolume(50.f);
+    }
+
+    if (deathBuffer.loadFromFile("audio/death.wav")) {
+        deathSound.setBuffer(deathBuffer);
+        deathSound.setVolume(50.f);
+    }
+}
+
+void initializePauseMenu() {
+    pausedText.setFont(font);
+    pausedText.setString("PAUSA");
+    pausedText.setCharacterSize(60);
+    pausedText.setFillColor(sf::Color::White);
+    sf::FloatRect pausedBounds = pausedText.getLocalBounds();
+    pausedText.setOrigin(pausedBounds.left + pausedBounds.width / 2.f,
+                         pausedBounds.top + pausedBounds.height / 2.f);
+    pausedText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f - 150.f);
+
+    resumeButton.setSize(sf::Vector2f(250.f, 70.f));
+    resumeButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f);
+    resumeButton.setFillColor(sf::Color(70, 70, 70));
+    resumeButton.setOutlineColor(sf::Color::White);
+    resumeButton.setOutlineThickness(3.f);
+
+    resumeButtonText.setFont(font);
+    resumeButtonText.setString("Reanudar");
+    resumeButtonText.setCharacterSize(32);
+    resumeButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect resumeBounds = resumeButtonText.getLocalBounds();
+    resumeButtonText.setOrigin(resumeBounds.left + resumeBounds.width / 2.f,
+                               resumeBounds.top + resumeBounds.height / 2.f);
+    resumeButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 35.f);
+
+    menuButton.setSize(sf::Vector2f(250.f, 70.f));
+    menuButton.setPosition(screenSize.x / 2.f - 125.f, screenSize.y / 2.f + 100.f);
+    menuButton.setFillColor(sf::Color(70, 70, 70));
+    menuButton.setOutlineColor(sf::Color::White);
+    menuButton.setOutlineThickness(3.f);
+
+    menuButtonText.setFont(font);
+    menuButtonText.setString("Volver al Menu");
+    menuButtonText.setCharacterSize(32);
+    menuButtonText.setFillColor(sf::Color::White);
+    sf::FloatRect menuBounds = menuButtonText.getLocalBounds();
+    menuButtonText.setOrigin(menuBounds.left + menuBounds.width / 2.f,
+                             menuBounds.top + menuBounds.height / 2.f);
+    menuButtonText.setPosition(screenSize.x / 2.f, screenSize.y / 2.f + 135.f);
 }
 
 void initializeUfo() {
@@ -582,6 +711,7 @@ void shoot() {
     bulletHitboxes.push_back(bulletHitbox);
     bulletTimers.push_back(60);
     bulletOwners.push_back(1);
+    shootSound.play();
 }
 
 void shoot2() {
@@ -607,6 +737,7 @@ void shoot2() {
     bulletHitboxes.push_back(bulletHitbox);
     bulletTimers.push_back(60);
     bulletOwners.push_back(2);
+    shootSound.play();
 }
 
 void ufoShoot() {
@@ -870,6 +1001,7 @@ void checkBulletPlayerCollisions() {
                 playerInvulnerable = 0;
                 lives--;
                 removeBullet(i);
+                deathSound.play();
                 break;
             }
         }
@@ -889,6 +1021,7 @@ void checkBulletPlayerCollisions() {
                 player2Invulnerable = 0;
                 removeBullet(i);
                 lives2--;
+                deathSound.play();
                 break;
             }
         }
@@ -906,12 +1039,14 @@ void checkPlayerPlayerCollisions() {
             playerRespawning = 120;
             playerInvulnerable = 0;
             lives--;
+            deathSound.play();
 
             player2Hitbox.setSize(sf::Vector2f(0.f, 0.f));
             player2Sprite.setScale(sf::Vector2f(0.f, 0.f));
             player2Respawning = 120;
             player2Invulnerable = 0;
             lives2--;
+            deathSound.play();
         }
     }
 }
@@ -958,6 +1093,54 @@ void render(sf::RenderWindow& window) {
         window.draw(vsModeButtonText);
         window.draw(vsAIButton);
         window.draw(vsAIButtonText);
+    } else if (currentMode == PAUSED) {
+        // Dibujar el juego en el fondo (congelado)
+        window.clear(sf::Color::Black);
+
+        if (lives > 0) {
+            window.draw(playerSprite);
+        }
+
+        if (lives2 > 0 && currentMode == TWO_PLAYERS) {
+            window.draw(player2Sprite);
+        }
+
+        for (size_t i = 0; i < ufos.size(); i++) {
+            window.draw(ufos[i]);
+        }
+
+        for (size_t i = 0; i < bullets.size(); i++) {
+            window.draw(bullets[i]);
+        }
+
+        for (size_t i = 0; i < asteroids.size(); i++) {
+            window.draw(asteroids[i]);
+        }
+
+        window.draw(scoreText);
+        if (currentMode == TWO_PLAYERS) {
+            window.draw(scoreText2);
+        }
+
+        for (int i = 0; i < lives; i++) {
+            window.draw(livesSprites[i]);
+        }
+
+        if (currentMode == TWO_PLAYERS) {
+            for (int i = 0; i < lives2; i++) {
+                window.draw(livesSprites2[i]);
+            }
+        }
+
+        sf::RectangleShape overlay(sf::Vector2f(screenSize.x, screenSize.y));
+        overlay.setFillColor(sf::Color(0, 0, 0, 180));
+        window.draw(overlay);
+
+        window.draw(pausedText);
+        window.draw(resumeButton);
+        window.draw(resumeButtonText);
+        window.draw(menuButton);
+        window.draw(menuButtonText);
     } else if (lives > 0 || lives2 > 0) {
         // GAME RENDER
         window.clear(sf::Color::Black);
@@ -975,10 +1158,10 @@ void render(sf::RenderWindow& window) {
                 // window.draw(player2Hitbox);
             }
 
-            if (isAI) {
-                aiVisionCircle.setPosition(player2Sprite.getPosition());
-                window.draw(aiVisionCircle);
-            }
+            // if (isAI) {
+            //     aiVisionCircle.setPosition(player2Sprite.getPosition());
+            //     window.draw(aiVisionCircle);
+            // }
         }
 
         for (size_t i = 0; i < ufos.size(); i++) {
@@ -1008,6 +1191,13 @@ void render(sf::RenderWindow& window) {
         if (currentMode == TWO_PLAYERS) {
             for (int i = 0; i < lives2; i++) {
                 window.draw(livesSprites2[i]);
+            }
+        }
+
+        if (instructionTimer > 0) {
+            window.draw(InstructionsText1);
+            if (lives2 > 0 && !isAI) {
+                window.draw(InstructionsText2);
             }
         }
 
@@ -1047,7 +1237,11 @@ int main() {
     }
     initializeButtons();
     initializeTexts();
+    initializeSounds();
+    initializePauseMenu();
     currentMode = MENU;
+
+    startSound.play();
 
     while (window.isOpen()) {
         if (lives == -1) {
@@ -1060,11 +1254,13 @@ int main() {
                         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
                         if (startButton.getGlobalBounds().contains(
                                 static_cast<sf::Vector2f>(mousePos))) {
+                            buttonSound.play();
                             lives = 3;
                             currentMode = SINGLE_PLAYER;
                             initializePlayer();
                         } else if (player2Button.getGlobalBounds().contains(
                                        static_cast<sf::Vector2f>(mousePos))) {
+                            buttonSound.play();
                             lives = 3;
                             lives2 = 3;
                             currentMode = TWO_PLAYERS;
@@ -1074,6 +1270,7 @@ int main() {
                             initializePlayer2();
                         } else if (vsModeButton.getGlobalBounds().contains(
                                        static_cast<sf::Vector2f>(mousePos))) {
+                            buttonSound.play();
                             lives = 3;
                             lives2 = 3;
                             currentMode = TWO_PLAYERS;
@@ -1083,6 +1280,7 @@ int main() {
                             initializePlayer2();
                         } else if (vsAIButton.getGlobalBounds().contains(
                                        static_cast<sf::Vector2f>(mousePos))) {
+                            buttonSound.play();
                             currentMode = DIFFICULTY_SELECT;
                         }
                     }
@@ -1094,6 +1292,7 @@ int main() {
 
                         if (easyButton.getGlobalBounds().contains(
                                 static_cast<sf::Vector2f>(mousePos))) {
+                            buttonSound.play();
                             aiDifficulty = AI_EASY;
                             aiThinkInterval = 10.f;
                             lives = 3;
@@ -1106,6 +1305,7 @@ int main() {
                             initializePlayer2();
                         } else if (mediumButton.getGlobalBounds().contains(
                                        static_cast<sf::Vector2f>(mousePos))) {
+                            buttonSound.play();
                             aiDifficulty = AI_MEDIUM;
                             aiThinkInterval = 5.f;
                             lives = 3;
@@ -1118,6 +1318,7 @@ int main() {
                             initializePlayer2();
                         } else if (hardButton.getGlobalBounds().contains(
                                        static_cast<sf::Vector2f>(mousePos))) {
+                            buttonSound.play();
                             aiDifficulty = AI_HARD;
                             aiThinkInterval = 1.f;
                             lives = 3;
@@ -1182,12 +1383,84 @@ int main() {
             }
 
             // std::cout << "Current mode: " << currentMode << std::endl;
+        } else if (currentMode == PAUSED) {
+            // std::cout << "PAUSED" << std::endl;
+            sf::Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed) window.close();
+
+                if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
+                    if (lives2 > 0) {
+                        currentMode = TWO_PLAYERS;
+                    } else {
+                        currentMode = SINGLE_PLAYER;
+                    }
+                }
+
+                if (event.type == sf::Event::MouseButtonReleased &&
+                    event.mouseButton.button == sf::Mouse::Left) {
+                    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+
+                    if (resumeButton.getGlobalBounds().contains(
+                            static_cast<sf::Vector2f>(mousePos))) {
+                        buttonSound.play();
+                        if (lives2 > 0) {
+                            currentMode = TWO_PLAYERS;
+                        } else {
+                            currentMode = SINGLE_PLAYER;
+                        }
+                    } else if (menuButton.getGlobalBounds().contains(
+                                   static_cast<sf::Vector2f>(mousePos))) {
+                        buttonSound.play();
+                        // Resetear el juego
+                        lives = -1;
+                        lives2 = -1;
+                        score = 0;
+                        score2 = 0;
+                        currentWave = 0;
+                        vsMode = false;
+                        isAI = false;
+                        asteroids.clear();
+                        asteroidSpeeds.clear();
+                        asteroidHitboxes.clear();
+                        bullets.clear();
+                        bulletSpeeds.clear();
+                        bulletHitboxes.clear();
+                        bulletTimers.clear();
+                        bulletOwners.clear();
+                        ufos.clear();
+                        ufoDirections.clear();
+                        ufoShootCDs.clear();
+                        ufoHitboxes.clear();
+                        currentMode = MENU;
+                    }
+                }
+            }
+
+            sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+
+            if (resumeButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                resumeButton.setFillColor(sf::Color(150, 150, 150));
+            } else {
+                resumeButton.setFillColor(sf::Color(70, 70, 70));
+            }
+
+            if (menuButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                menuButton.setFillColor(sf::Color(150, 150, 150));
+            } else {
+                menuButton.setFillColor(sf::Color(70, 70, 70));
+            }
         } else if (lives > 0 || lives2 > 0) {
             // GAME MAIN
             sf::Event event;
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed) window.close();
+                if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
+                    currentMode = PAUSED;
+                }
             }
+
+            // std::cout << "Mode: " << currentMode << std::endl;
 
             if (lives > 0) {
                 updatePlayer();
@@ -1236,7 +1509,10 @@ int main() {
                 if (playerInvulnerable > 0) playerInvulnerable--;
 
                 scoreText.setString("P1: " + std::to_string(score));
-                if (checkPlayerCollisions()) lives--;
+                if (checkPlayerCollisions()) {
+                    lives--;
+                    deathSound.play();
+                }
             }
 
             if (lives2 > 0 && currentMode == TWO_PLAYERS) {
@@ -1281,7 +1557,10 @@ int main() {
                 if (player2Invulnerable > 0) player2Invulnerable--;
 
                 scoreText2.setString("P2: " + std::to_string(score2));
-                if (checkPlayer2Collisions()) lives2--;
+                if (checkPlayer2Collisions()) {
+                    lives2--;
+                    deathSound.play();
+                }
             }
 
             if (asteroids.empty() && currentWave < maxWaves) {
@@ -1304,6 +1583,8 @@ int main() {
             updateBullets();
             updateAsteroids();
             removeBullets();
+
+            if (instructionTimer > 0) instructionTimer--;
 
         } else {
             currentMode = GAME_OVER;
@@ -1330,6 +1611,7 @@ int main() {
                         bulletOwners.clear();
                         initializePlayer();
                         currentMode = MENU;
+                        instructionTimer = 90;
                     }
                 }
             }

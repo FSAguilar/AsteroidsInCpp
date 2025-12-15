@@ -33,6 +33,8 @@ El repositorio incluye todas las DLLs necesarias para ejecutar el juego:
 - `sfml-graphics-2.dll`
 - `sfml-window-2.dll`
 - `sfml-system-2.dll`
+- `sfml-audio-2.dll`
+- `openal32.dll` (requerida por sfml-audio)
 
 ### DLLs del Runtime de MinGW (GCC):
 - `libstdc++-6.dll`

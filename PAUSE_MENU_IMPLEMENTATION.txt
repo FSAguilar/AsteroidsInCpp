@@ -1,0 +1,96 @@
+// ============================================
+// CÓDIGO PARA AGREGAR AL MENÚ DE PAUSA
+// ============================================
+
+// 1. FUNCIÓN PARA INICIALIZAR EL MENÚ DE PAUSA
+// Agregar esta función ANTES de int main() (alrededor de la línea 1139)
+
+v
+
+// 2. LLAMAR A initializePauseMenu() EN EL MAIN
+// En la función main(), después de initializeSounds() (línea 1148), agregar:
+    initializePauseMenu();
+
+// 3. AGREGAR RENDERIZADO DEL MENÚ DE PAUSA
+// En la función render(), DESPUÉS del bloque "else if (currentMode == GAME_OVER)" 
+// y ANTES de "window.display();" (alrededor de línea 1135), agregar:
+
+    
+
+// 4. AGREGAR LÓGICA PARA PAUSAR CON ESC
+// En el loop principal del juego (donde está "// GAME MAIN", alrededor de línea 1278),
+// DESPUÉS de "while (window.pollEvent(event)) {" agregar:
+
+                
+
+// 5. AGREGAR MANEJO DE EVENTOS DEL MENÚ DE PAUSA
+// DESPUÉS del bloque de GAME_OVER (alrededor de línea 1435), ANTES del último "}"
+// del loop principal, agregar:
+
+        } else if (currentMode == PAUSED) {
+            sf::Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed) window.close();
+
+                if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
+                    if (lives2 > 0) {
+                        currentMode = TWO_PLAYERS;
+                    } else {
+                        currentMode = SINGLE_PLAYER;
+                    }
+                }
+
+                if (event.type == sf::Mouse ButtonReleased &&
+                    event.mouseButton.button == sf::Mouse::Left) {
+                    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                    
+                    if (resumeButton.getGlobalBounds().contains(
+                            static_cast<sf::Vector2f>(mousePos))) {
+                        buttonSound.play();
+                        if (lives2 > 0) {
+                            currentMode = TWO_PLAYERS;
+                        } else {
+                            currentMode = SINGLE_PLAYER;
+                        }
+                    } else if (menuButton.getGlobalBounds().contains(
+                                   static_cast<sf::Vector2f>(mousePos))) {
+                        buttonSound.play();
+                        // Resetear el juego
+                        lives = -1;
+                        lives2 = -1;
+                        score = 0;
+                        score2 = 0;
+                        currentWave = 0;
+                        vsMode = false;
+                        isAI = false;
+                        asteroids.clear();
+                        asteroidSpeeds.clear();
+                        asteroidHitboxes.clear();
+                        bullets.clear();
+                        bulletSpeeds.clear();
+                        bulletHitboxes.clear();
+                        bulletTimers.clear();
+                        bulletOwners.clear();
+                        ufos.clear();
+                        ufoDirections.clear();
+                        ufoShootCDs.clear();
+                        ufoHitboxes.clear();
+                        currentMode = MENU;
+                    }
+                }
+            }
+
+            sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+
+            if (resumeButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                resumeButton.setFillColor(sf::Color(150, 150, 150));
+            } else {
+                resumeButton.setFillColor(sf::Color(70, 70, 70));
+            }
+
+            if (menuButton.getGlobalBounds().contains(static_cast<sf::Vector2f>(mousePos))) {
+                menuButton.setFillColor(sf::Color(150, 150, 150));
+            } else {
+                menuButton.setFillColor(sf::Color(70, 70, 70));
+            }
+        }

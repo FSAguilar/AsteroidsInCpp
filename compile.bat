@@ -1,5 +1,5 @@
 @echo off
-g++ -o juego.exe main.cpp -IC:\SFML-2.6.2\include -LC:\SFML-2.6.2\lib -lsfml-graphics -lsfml-window -lsfml-system
+g++ -o juego.exe main.cpp -IC:\SFML-2.6.2\include -LC:\SFML-2.6.2\lib -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio
 
 
 if %errorlevel% equ 0 (
