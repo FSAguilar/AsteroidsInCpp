@@ -965,7 +965,7 @@ void render(sf::RenderWindow& window) {
         if (lives > 0) {
             if (playerInvulnerable == 0 || (playerInvulnerable / 10) % 2 == 0) {
                 window.draw(playerSprite);
-                window.draw(playerHitbox);
+                // window.draw(playerHitbox);
             }
         }
 
@@ -992,7 +992,7 @@ void render(sf::RenderWindow& window) {
 
         for (size_t i = 0; i < asteroids.size(); i++) {
             window.draw(asteroids[i]);
-            window.draw(asteroidHitboxes[i]);
+            // window.draw(asteroidHitboxes[i]);
         }
 
         window.draw(scoreText);

@@ -1,10 +1,11 @@
-# Ejecutables
+# Ejecutables (excepto el juego principal)
 *.exe
+!juego.exe
 *.out
 *.app
 
-# DLLs de SFML (no deben estar en el repositorio)
-*.dll
+# DLLs necesarias para ejecutar el juego (NO ignorar)
+!*.dll
 
 # Archivos de compilación
 *.o

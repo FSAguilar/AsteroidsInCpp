@@ -17,19 +17,44 @@ compile.bat
 
 ## Ejecución
 
-Después de compilar, ejecuta:
+Si descargas el repositorio para **solo ejecutar el juego** (sin compilar):
 
-```bash
-juego.exe
-```
+1. Asegúrate de que todas las DLLs estén en la misma carpeta que `juego.exe`
+2. Ejecuta:
+   ```bash
+   juego.exe
+   ```
+
+## DLLs Necesarias
+
+El repositorio incluye todas las DLLs necesarias para ejecutar el juego:
+
+### DLLs de SFML 2.6.2:
+- `sfml-graphics-2.dll`
+- `sfml-window-2.dll`
+- `sfml-system-2.dll`
+
+### DLLs del Runtime de MinGW (GCC):
+- `libstdc++-6.dll`
+- `libgcc_s_seh-1.dll`
+- `libwinpthread-1.dll`
+
+**Importante:** Si al ejecutar `juego.exe` obtienes un error sobre "punto de entrada del procedimiento" o DLLs faltantes, asegúrate de que **todas** estas DLLs estén en la misma carpeta que el ejecutable.
 
 ## Estructura del Proyecto
 
 - `main.cpp` - Archivo principal del programa
 - `compile.bat` - Script de compilación
+- `juego.exe` - Ejecutable compilado
+- `*.dll` - Bibliotecas dinámicas necesarias
 - `images/` - Recursos de imágenes
+- `fonts/` - Fuentes del juego
 - `compile_flags.txt` - Configuración para clangd
 
-## Notas
+## Solución de Problemas
 
-Este proyecto utiliza SFML 2.6.2. Asegúrate de tener las DLLs necesarias en el directorio del ejecutable o en tu PATH.
+### Error: "No se encuentra el punto de entrada del procedimiento..."
+Este error ocurre cuando faltan las DLLs del runtime de MinGW. Asegúrate de descargar **todas** las DLLs del repositorio o cópialas manualmente desde tu instalación de MinGW (`D:\msys64\mingw64\bin\` o similar).
+
+### Error: "No se puede iniciar el programa porque falta SFML..."
+Verifica que las tres DLLs de SFML estén en el mismo directorio que `juego.exe`.
